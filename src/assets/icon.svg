@@ -1,0 +1,5 @@
+<!-- SVG placeholder for extension icon -->
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" fill="#ff2442" rx="20"/>
+  <text x="64" y="80" font-family="Arial, sans-serif" font-size="48" fill="white" text-anchor="middle">X</text>
+</svg>

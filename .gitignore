@@ -1,0 +1,26 @@
+# 依赖文件夹（通常占 90% 以上文件）
+node_modules/
+
+# 编译/打包产物
+dist/
+build/
+out/
+
+# 缓存和日志
+*.log
+.cache/
+tmp/
+
+# 系统和编辑器文件
+.DS_Store       # Mac 系统文件
+Thumbs.db       # Windows 系统文件
+.vscode/        # VS Code 本地配置（如不需要共享给团队）
+.idea/          # IDEA 编辑器文件（如有）
+
+# 环境变量和敏感信息
+.env
+.env.local
+
+# 其他临时文件
+*.tmp
+*.bak
