@@ -436,13 +436,13 @@ class PopupManager {
   // 处理消息
   private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void): void {
     switch (message.action) {
-      case 'updateNoteData':
-        this.currentNoteData = message.data;
-        this.displayNoteInfo(message.data);
-        break;
-      case 'pageStatusChanged':
-        this.checkCurrentPage();
-        break;
+    case 'updateNoteData':
+      this.currentNoteData = message.data;
+      this.displayNoteInfo(message.data);
+      break;
+    case 'pageStatusChanged':
+      this.checkCurrentPage();
+      break;
     }
   }
 
