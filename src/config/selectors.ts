@@ -1,3 +1,5 @@
+import { SafeStorage } from '../utils/safeStorage';
+
 export interface SelectorsConfig {
   title: string[]
   author: string[]
@@ -62,7 +64,7 @@ export class SelectorManager {
 
   private async loadUserConfig(): Promise<void> {
     try {
-      const result = await chrome.storage.local.get(['selectorsConfig']);
+      const result = await SafeStorage.get(['selectorsConfig']);
       if (result.selectorsConfig) {
         this.currentConfig = { ...DEFAULT_SELECTORS, ...result.selectorsConfig };
       }
@@ -74,7 +76,7 @@ export class SelectorManager {
   public async saveUserConfig(config: Partial<SelectorConfig>): Promise<void> {
     try {
       const mergedConfig = { ...this.currentConfig, ...config };
-      await chrome.storage.local.set({ selectorsConfig: mergedConfig });
+      await SafeStorage.set({ selectorsConfig: mergedConfig });
       this.currentConfig = mergedConfig;
     } catch (error) {
       console.error('保存用户选择器配置失败:', error);

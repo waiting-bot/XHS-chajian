@@ -6,6 +6,8 @@ import { errorDetailsManager } from '../utils/errorDetails';
 import { errorManager } from '../utils/errorManager';
 import { initializeLogging, logManager } from '../utils/logManager';
 import { initializeRecovery, recoveryManager } from '../utils/recoveryManager';
+import { SafeStorage } from '../utils/safeStorage';
+import { storageManager } from '../utils/storageManager';
 
 interface NoteData {
   title: string;
@@ -40,17 +42,125 @@ class PopupManager {
   private isNoteEditorVisible: boolean = false;
 
   constructor() {
-    this.initializeErrorHandling();
-    this.initializeEventListeners();
-    this.loadConfigs();
-    this.loadNoteHistory();
-    this.checkCurrentPage();
-    this.initializeTagChips();
+    this.initializeWithReadinessCheck();
+  }
+
+  // 带就绪检查的初始化
+  private async initializeWithReadinessCheck(): Promise<void> {
+    try {
+      this.showInitializationStatus('正在初始化系统...');
+      
+      // 1. 等待存储管理器就绪
+      await this.waitForStorageReady();
+      
+      // 2. 初始化错误处理
+      await this.initializeErrorHandling();
+      
+      // 3. 初始化事件监听器
+      this.initializeEventListeners();
+      
+      // 4. 加载配置和数据
+      await this.loadConfigs();
+      await this.loadNoteHistory();
+      
+      // 5. 检查当前页面
+      await this.checkCurrentPage();
+      
+      // 6. 初始化UI组件
+      this.initializeTagChips();
+      
+      this.hideInitializationStatus();
+      showSuccess('系统就绪', '所有组件已成功初始化');
+    } catch (error) {
+      console.error('Popup初始化失败:', error);
+      this.showInitializationError('初始化失败', error.message);
+    }
+  }
+
+  // 等待存储管理器就绪
+  private async waitForStorageReady(): Promise<void> {
+    const maxAttempts = 10;
+    const attemptDelay = 500;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        this.showInitializationStatus(`正在连接存储 (${attempt}/${maxAttempts})...`);
+        
+        // 检查存储管理器是否就绪
+        await storageManager.ready;
+        
+        // 测试存储操作
+        await SafeStorage.get(['_test']);
+        
+        console.log('✅ 存储管理器已就绪');
+        return;
+      } catch (error) {
+        console.warn(`存储连接尝试 ${attempt}/${maxAttempts} 失败:`, error);
+        
+        if (attempt === maxAttempts) {
+          throw new Error('无法连接到存储系统，请刷新页面或重启扩展');
+        }
+        
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, attemptDelay));
+      }
+    }
+  }
+
+  // 显示初始化状态
+  private showInitializationStatus(message: string): void {
+    const statusIndicator = document.getElementById('statusIndicator');
+    if (statusIndicator) {
+      const indicatorDot = statusIndicator.querySelector('.indicator-dot');
+      const statusText = statusIndicator.querySelector('.status-text');
+      
+      if (indicatorDot && statusText) {
+        indicatorDot.className = 'indicator-dot loading';
+        statusText.textContent = message;
+      }
+    }
+  }
+
+  // 隐藏初始化状态
+  private hideInitializationStatus(): void {
+    const statusIndicator = document.getElementById('statusIndicator');
+    if (statusIndicator) {
+      const indicatorDot = statusIndicator.querySelector('.indicator-dot');
+      const statusText = statusIndicator.querySelector('.status-text');
+      
+      if (indicatorDot && statusText) {
+        indicatorDot.className = 'indicator-dot success';
+        statusText.textContent = '系统就绪';
+      }
+    }
+  }
+
+  // 显示初始化错误
+  private showInitializationError(title: string, message: string): void {
+    this.showInitializationStatus('初始化失败');
+    showError(title, message);
+    
+    // 显示用户友好的错误提示
+    const errorContainer = document.createElement('div');
+    errorContainer.className = 'initialization-error';
+    errorContainer.innerHTML = `
+      <div class="error-icon">⚠️</div>
+      <div class="error-title">${title}</div>
+      <div class="error-message">${message}</div>
+      <div class="error-actions">
+        <button onclick="location.reload()" class="retry-btn">刷新页面</button>
+        <button onclick="this.parentElement.parentElement.remove()" class="dismiss-btn">忽略</button>
+      </div>
+    `;
+    
+    document.body.insertBefore(errorContainer, document.body.firstChild);
   }
 
   // 初始化错误处理
   private async initializeErrorHandling(): Promise<void> {
     try {
+      this.showInitializationStatus('正在初始化错误处理系统...');
+      
       // 初始化错误处理系统
       await initializeLogging();
       await initializeRecovery();
@@ -69,18 +179,25 @@ class PopupManager {
       });
 
       // 启动性能监控
-      const { performanceMonitor } = await import('../utils/performanceMonitor');
-      performanceMonitor.startMonitoring();
+      try {
+        const { performanceMonitor } = await import('../utils/performanceMonitor');
+        performanceMonitor.startMonitoring();
+      } catch (perfError) {
+        console.warn('性能监控启动失败:', perfError);
+      }
 
       // 初始化缓存系统
-      const { initializeCache } = await import('../utils/cacheManager');
-      await initializeCache();
+      try {
+        const { initializeCache } = await import('../utils/cacheManager');
+        await initializeCache();
+      } catch (cacheError) {
+        console.warn('缓存系统启动失败:', cacheError);
+      }
       
-      console.log('错误处理系统初始化完成');
-      showSuccess('系统初始化', '所有错误处理和性能监控系统已启动');
+      console.log('✅ 错误处理系统初始化完成');
     } catch (error) {
       console.error('错误处理系统初始化失败:', error);
-      showError('初始化失败', '系统初始化过程中发生错误', error);
+      // 不抛出错误，允许继续初始化其他组件
     }
   }
 
@@ -245,9 +362,15 @@ class PopupManager {
     }
 
     // 检查配置
-    const activeConfig = await configManager.getActiveConfig();
-    if (!activeConfig) {
-      this.updateStatus('error', '请先配置飞书设置');
+    let activeConfig;
+    try {
+      activeConfig = await configManager.getActiveConfig();
+      if (!activeConfig) {
+        this.updateStatus('error', '请先配置飞书设置');
+        return;
+      }
+    } catch (configError) {
+      this.updateStatus('error', '配置系统异常，请刷新页面重试');
       return;
     }
 
@@ -260,35 +383,57 @@ class PopupManager {
       // 更新数据预览
       this.updateDataPreview(this.currentNoteData);
       
-      // 发送消息到background script处理数据
+      // 获取当前标签页
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab.id) {
-        const response = await chrome.tabs.sendMessage(tab.id, { action: 'collectNoteData' });
-        
-        if (response && response.success) {
-          // 将数据发送到background script处理
-          const bgResponse = await chrome.runtime.sendMessage({
-            type: 'PROCESS_NOTE_DATA',
-            data: response.data,
-            sender: { tab: { url: tab.url } }
-          });
-          
-          if (bgResponse && bgResponse.success) {
-            this.updateStatus('success', '采集成功并写入飞书');
-          } else {
-            throw new Error(bgResponse?.error || '数据处理失败');
-          }
-        } else {
-          throw new Error(response?.error || '数据采集失败');
-        }
+      if (!tab.id) {
+        throw new Error('无法获取当前标签页信息');
+      }
+
+      // 第一步：从content script收集数据
+      this.showInitializationStatus('正在从页面采集数据...');
+      const contentResponse = await chrome.tabs.sendMessage(tab.id, { action: 'collectNoteData' });
+      
+      if (!contentResponse || !contentResponse.success) {
+        throw new Error(contentResponse?.error || '页面数据采集失败，请刷新页面重试');
+      }
+
+      // 第二步：发送到background script处理
+      this.showInitializationStatus('正在处理数据并写入飞书...');
+      const bgResponse = await chrome.runtime.sendMessage({
+        type: 'PROCESS_NOTE_DATA',
+        data: contentResponse.data,
+        sender: { tab: { url: tab.url } }
+      });
+      
+      if (bgResponse && bgResponse.success) {
+        this.updateStatus('success', '✅ 采集成功并写入飞书');
+        showSuccess('采集完成', '笔记数据已成功写入飞书表格');
       } else {
-        throw new Error('无法获取当前标签页');
+        throw new Error(bgResponse?.error || '数据处理失败');
       }
     } catch (error) {
-      this.updateStatus('error', '采集失败: ' + (error as Error).message);
+      console.error('采集过程失败:', error);
+      
+      // 提供用户友好的错误信息
+      let errorMessage = '采集失败';
+      if (error.message.includes('扩展正在初始化')) {
+        errorMessage = '扩展正在初始化中，请稍后再试';
+      } else if (error.message.includes('页面数据采集失败')) {
+        errorMessage = '页面数据采集失败，请刷新页面后重试';
+      } else if (error.message.includes('网络')) {
+        errorMessage = '网络连接异常，请检查网络设置';
+      } else if (error.message.includes('权限')) {
+        errorMessage = '权限不足，请重新安装扩展';
+      } else {
+        errorMessage = `采集失败: ${error.message}`;
+      }
+      
+      this.updateStatus('error', errorMessage);
+      showError('采集失败', errorMessage, error);
     } finally {
       collectBtn.textContent = originalText;
       collectBtn.disabled = false;
+      this.hideInitializationStatus();
     }
   }
 
@@ -401,7 +546,12 @@ class PopupManager {
   // 加载配置
   private async loadConfigs(): Promise<void> {
     try {
-      // 使用新的ConfigManager加载配置
+      this.showInitializationStatus('正在加载配置...');
+      
+      // 等待配置管理器就绪
+      await configManager.ready;
+      
+      // 使用ConfigManager加载配置
       const configData = await configManager.getConfig();
       this.configs = configData.feishuConfigs || [];
       this.currentConfigId = configData.activeConfigId || 'default';
@@ -409,9 +559,27 @@ class PopupManager {
       this.updateConfigSelector();
       this.loadCurrentConfig();
       this.updateConnectionStatus();
+      
+      console.log('✅ 配置加载完成');
     } catch (error) {
       console.error('加载配置失败:', error);
-      this.updateStatus('error', '配置加载失败');
+      
+      // 提供用户友好的错误信息
+      let errorMessage = '配置加载失败';
+      if (error.message.includes('storage')) {
+        errorMessage = '存储系统异常，请刷新页面重试';
+      } else if (error.message.includes('network')) {
+        errorMessage = '网络连接异常，请检查网络设置';
+      } else if (error.message.includes('permission')) {
+        errorMessage = '权限不足，请重新安装扩展';
+      }
+      
+      this.updateStatus('error', errorMessage);
+      
+      // 创建默认配置以保持UI可用
+      this.configs = [];
+      this.currentConfigId = 'default';
+      this.updateConfigSelector();
     }
   }
 
@@ -580,30 +748,30 @@ class PopupManager {
         if (config && config.accessToken) {
           const result = await connectionTester.testConnection(config);
           if (result.success) {
-            connectionStatus.innerHTML = '
+            connectionStatus.innerHTML = `
               <div class="status-dot online"></div>
               <span>已连接</span>
-            ';
+            `;
           } else {
-            connectionStatus.innerHTML = '
+            connectionStatus.innerHTML = `
               <div class="status-dot offline"></div>
               <span>连接失败</span>
-            ';
+            `;
           }
         } else {
-          connectionStatus.innerHTML = '
+          connectionStatus.innerHTML = `
             <div class="status-dot offline"></div>
             <span>未连接</span>
-          ';
+          `;
         }
       }
     } catch (error) {
       const connectionStatus = document.getElementById('connectionStatus');
       if (connectionStatus) {
-        connectionStatus.innerHTML = '
+        connectionStatus.innerHTML = `
           <div class="status-dot offline"></div>
           <span>连接异常</span>
-        ';
+        `;
       }
     }
   }
@@ -902,7 +1070,7 @@ class PopupManager {
     }
 
     // 保存到Chrome存储
-    await chrome.storage.local.set({ noteHistory: this.noteHistory });
+    await SafeStorage.set({ noteHistory: this.noteHistory });
 
     if (isManualSave) {
       // 手动保存时更新历史记录显示
@@ -1031,7 +1199,7 @@ class PopupManager {
   // 加载备注历史记录
   private async loadNoteHistory(): Promise<void> {
     try {
-      const result = await chrome.storage.local.get(['noteHistory']);
+      const result = await SafeStorage.get(['noteHistory']);
       this.noteHistory = result.noteHistory || [];
     } catch (error) {
       console.error('加载备注历史失败:', error);
@@ -1138,14 +1306,6 @@ function showNoteEditor(): void {
   const manager = (window as any).popupManager;
   if (manager) {
     manager.showNoteEditor();
-  }
-}
-
-// 关闭备注编辑器
-function closeNoteEditor(): void {
-  const manager = (window as any).popupManager;
-  if (manager) {
-    manager.closeNoteEditor();
   }
 }
 

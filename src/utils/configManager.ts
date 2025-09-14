@@ -23,12 +23,17 @@ export class ConfigManager {
   private static readonly STORAGE_KEY = 'storageConfig';
   private configCache: StorageConfig | null = null;
   private listeners: Set<(config: StorageConfig) => void> = new Set();
+  private isInitialized: boolean = false;
 
   constructor() {
-    this.initialize();
+    // 不在构造函数中自动初始化，改为懒加载
   }
 
-  private async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
     try {
       await this.loadConfig();
       
@@ -39,13 +44,24 @@ export class ConfigManager {
           this.notifyListeners();
         }
       });
+      
+      this.isInitialized = true;
+      console.log('配置管理器初始化成功');
     } catch (error) {
       console.error('配置管理器初始化失败:', error);
       await this.initializeDefaultConfig();
     }
   }
 
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+  }
+
   private async initializeDefaultConfig(): Promise<void> {
+    // 确保加密管理器已初始化
+    await encryptionManager.initialize();
     const defaultConfig: StorageConfig = {
       feishuConfigs: [{
         id: 'default',
@@ -96,9 +112,9 @@ export class ConfigManager {
         }
       },
       encryption: {
-        enabled: encryptionManager.isEncryptionEnabled(),
+        enabled: await encryptionManager.isEncryptionEnabled(),
         algorithm: 'AES-256-GCM',
-        keyVersion: encryptionManager.getKeyVersion()
+        keyVersion: await encryptionManager.getKeyVersion()
       }
     };
 
@@ -141,6 +157,8 @@ export class ConfigManager {
   }
 
   private async validateAndFixConfig(config: any): Promise<StorageConfig> {
+    // 确保加密管理器已初始化
+    await encryptionManager.initialize();
     try {
       const fixedConfig: StorageConfig = {
         feishuConfigs: Array.isArray(config.feishuConfigs) 
@@ -184,9 +202,9 @@ export class ConfigManager {
           }
         },
         encryption: {
-          enabled: encryptionManager.isEncryptionEnabled(),
+          enabled: await encryptionManager.isEncryptionEnabled(),
           algorithm: 'AES-256-GCM',
-          keyVersion: encryptionManager.getKeyVersion()
+          keyVersion: await encryptionManager.getKeyVersion()
         }
       };
 
@@ -232,6 +250,8 @@ export class ConfigManager {
 
   // 获取配置
   async getConfig(): Promise<StorageConfig> {
+    await this.ensureInitialized();
+    
     if (!this.configCache) {
       await this.loadConfig();
     }

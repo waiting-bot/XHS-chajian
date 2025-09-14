@@ -1,4 +1,6 @@
 import type { EncryptionKey } from '../types/config';
+import { storageManager } from './storageManager';
+import { SafeStorage } from './safeStorage';
 
 export class EncryptionManager {
   private static readonly ALGORITHM = 'AES-GCM';
@@ -8,23 +10,40 @@ export class EncryptionManager {
 
   private encryptionKey: CryptoKey | null = null;
   private keyVersion: number = 1;
+  private isInitialized: boolean = false;
 
   constructor() {
-    this.initialize();
+    // 不在构造函数中自动初始化，改为懒加载
   }
 
-  private async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
     try {
       await this.generateOrLoadKey();
+      this.isInitialized = true;
+      console.log('加密管理器初始化成功');
     } catch (error) {
       console.error('加密管理器初始化失败:', error);
+      throw error;
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initialize();
     }
   }
 
   private async generateOrLoadKey(): Promise<void> {
     try {
+      // 等待存储管理器就绪
+      await storageManager.ready;
+      
       // 尝试从Chrome存储加载现有密钥
-      const result = await chrome.storage.local.get(['encryptionKey']);
+      const result = await SafeStorage.get(['encryptionKey']);
       
       if (result.encryptionKey) {
         const keyData = await this.importKey(result.encryptionKey.keyData);
@@ -42,15 +61,20 @@ export class EncryptionManager {
 
   private async generateNewKey(): Promise<void> {
     try {
+      // 检查 Chrome API 是否可用
+      if (!chrome || !chrome.runtime) {
+        throw new Error('Chrome runtime API 不可用');
+      }
+      
       // 使用扩展ID作为密钥派生的一部分
-      const extensionId = chrome.runtime.id;
+      const extensionId = chrome.runtime.id || 'unknown';
       const salt = new TextEncoder().encode(extensionId + '_xiaohongshu_collector_salt');
       
-      // 生成主密钥
+      // 生成主密钥 - 使用 literal 值避免静态属性访问问题
       const masterKey = await crypto.subtle.generateKey(
         {
           name: 'AES-GCM',
-          length: this.KEY_LENGTH,
+          length: 256, // 直接使用 literal 值而不是静态属性
         },
         true,
         ['encrypt', 'decrypt']
@@ -64,13 +88,13 @@ export class EncryptionManager {
       const keyData = btoa(String.fromCharCode(...new Uint8Array(exportedKey)));
       
       const encryptionKey: EncryptionKey = {
-        algorithm: this.ALGORITHM,
+        algorithm: 'AES-GCM', // 使用 literal 值
         keyData,
-        iv: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(this.IV_LENGTH)))),
+        iv: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(12)))), // 直接使用 literal 值
         version: this.keyVersion
       };
 
-      await chrome.storage.local.set({ encryptionKey });
+      await SafeStorage.set({ encryptionKey });
     } catch (error) {
       console.error('生成新密钥失败:', error);
       throw error;
@@ -94,6 +118,8 @@ export class EncryptionManager {
   }
 
   async encrypt(data: string): Promise<string> {
+    await this.ensureInitialized();
+    
     if (!this.encryptionKey) {
       console.warn('加密密钥未初始化，返回原始数据');
       return data;
@@ -104,12 +130,12 @@ export class EncryptionManager {
       const dataBytes = encoder.encode(data);
       
       // 生成随机IV
-      const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
+      const iv = crypto.getRandomValues(new Uint8Array(EncryptionManager.IV_LENGTH));
       
       // 加密数据
       const encryptedData = await crypto.subtle.encrypt(
         {
-          name: this.ALGORITHM,
+          name: EncryptionManager.ALGORITHM,
           iv: iv,
         },
         this.encryptionKey,
@@ -130,6 +156,8 @@ export class EncryptionManager {
   }
 
   async decrypt(encryptedData: string): Promise<string> {
+    await this.ensureInitialized();
+    
     if (!this.encryptionKey) {
       console.warn('加密密钥未初始化，返回原始数据');
       return encryptedData;
@@ -142,13 +170,13 @@ export class EncryptionManager {
       const version = data[data.length - 1];
       
       // 提取IV和加密数据
-      const iv = data.slice(0, this.IV_LENGTH);
-      const encrypted = data.slice(this.IV_LENGTH, data.length - 1);
+      const iv = data.slice(0, EncryptionManager.IV_LENGTH);
+      const encrypted = data.slice(EncryptionManager.IV_LENGTH, data.length - 1);
       
       // 解密数据
       const decryptedData = await crypto.subtle.decrypt(
         {
-          name: this.ALGORITHM,
+          name: EncryptionManager.ALGORITHM,
           iv: iv,
         },
         this.encryptionKey,
@@ -167,6 +195,7 @@ export class EncryptionManager {
     data: T,
     sensitiveFields: string[] = ['accessToken', 'appSecret']
   ): Promise<T> {
+    await this.ensureInitialized();
     const encryptedData = { ...data };
     
     for (const field of sensitiveFields) {
@@ -186,6 +215,7 @@ export class EncryptionManager {
     data: T,
     sensitiveFields: string[] = ['accessToken', 'appSecret']
   ): Promise<T> {
+    await this.ensureInitialized();
     const decryptedData = { ...data };
     
     for (const field of sensitiveFields) {
@@ -212,22 +242,67 @@ export class EncryptionManager {
     }
   }
 
-  isEncryptionEnabled(): boolean {
+  async isEncryptionEnabled(): Promise<boolean> {
+    await this.ensureInitialized();
     return this.encryptionKey !== null;
   }
 
-  getKeyVersion(): number {
+  async getKeyVersion(): Promise<number> {
+    await this.ensureInitialized();
     return this.keyVersion;
   }
 
   async clearKey(): Promise<void> {
     try {
-      await chrome.storage.local.remove(['encryptionKey']);
+      await SafeStorage.remove(['encryptionKey']);
       this.encryptionKey = null;
       this.keyVersion = 1;
       console.log('加密密钥已清除');
     } catch (error) {
       console.error('清除加密密钥失败:', error);
+    }
+  }
+
+  // 健康检查
+  async healthCheck(): Promise<{ healthy: boolean; issues: string[] }> {
+    const issues: string[] = [];
+    
+    try {
+      // 检查是否已初始化
+      if (!this.isInitialized) {
+        issues.push('加密管理器未初始化');
+      }
+
+      // 检查加密密钥
+      if (!this.encryptionKey) {
+        issues.push('加密密钥不存在');
+      }
+
+      // 测试加密解密功能
+      if (this.encryptionKey) {
+        try {
+          const testData = 'test';
+          const encrypted = await this.encrypt(testData);
+          const decrypted = await this.decrypt(encrypted);
+          
+          if (decrypted !== testData) {
+            issues.push('加密解密测试失败');
+          }
+        } catch (error) {
+          issues.push('加密解密测试异常: ' + error.message);
+        }
+      }
+
+      return {
+        healthy: issues.length === 0,
+        issues
+      };
+    } catch (error) {
+      issues.push('健康检查异常: ' + error.message);
+      return {
+        healthy: false,
+        issues
+      };
     }
   }
 }

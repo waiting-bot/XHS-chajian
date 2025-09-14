@@ -3,10 +3,12 @@ import { fileProcessor } from '../utils/fileProcessor';
 import { configManager } from '../utils/configManager';
 import { connectionTester } from '../utils/connectionTester';
 import { FeishuClient } from '../api/feishu';
+import { storageManager } from '../utils/storageManager';
+import { encryptionManager } from '../utils/encryption';
 
-// 初始化组件
-const dataProcessor = new DataProcessor();
-const batchProcessor = new BatchProcessor(dataProcessor);
+// 延迟初始化组件
+let dataProcessor: DataProcessor | null = null;
+let batchProcessor: BatchProcessor | null = null;
 
 // 安装事件
 chrome.runtime.onInstalled.addListener(() => {
@@ -20,26 +22,200 @@ chrome.runtime.onStartup.addListener(() => {
   initializeExtension();
 });
 
+// 检查扩展是否已初始化
+function isExtensionInitialized(): boolean {
+  return dataProcessor !== null && batchProcessor !== null;
+}
+
+// 确保扩展已初始化
+async function ensureExtensionInitialized(): Promise<void> {
+  if (!isExtensionInitialized()) {
+    console.log('扩展未初始化，开始初始化...');
+    await initializeExtension();
+    
+    // 再次检查是否成功初始化
+    if (!isExtensionInitialized()) {
+      throw new Error('扩展初始化失败，无法处理请求');
+    }
+  }
+}
+
+// 综合健康检查
+async function performHealthCheck(): Promise<{ allHealthy: boolean; results: any[] }> {
+  console.log('开始系统健康检查...');
+  
+  const results = [];
+  
+  try {
+    // 检查存储管理器
+    const storageHealth = await storageManager.healthCheck();
+    results.push({ component: 'StorageManager', ...storageHealth });
+    
+    // 检查加密管理器
+    const encryptionHealth = await encryptionManager.healthCheck();
+    results.push({ component: 'EncryptionManager', ...encryptionHealth });
+    
+    // 检查配置管理器
+    const configHealth = await configManager.getConfig().then(() => ({ healthy: true, issues: [] })).catch(error => ({
+      healthy: false, issues: [error.message]
+    }));
+    results.push({ component: 'ConfigManager', ...configHealth });
+    
+    // 检查数据处理器
+    const processorHealthy = dataProcessor !== null && batchProcessor !== null;
+    results.push({
+      component: 'DataProcessor',
+      healthy: processorHealthy,
+      issues: processorHealthy ? [] : ['数据处理器未初始化']
+    });
+    
+    const allHealthy = results.every(r => r.healthy);
+    
+    if (allHealthy) {
+      console.log('✅ 系统健康检查通过');
+    } else {
+      console.warn('⚠️ 系统健康检查发现问题:');
+      results.forEach(result => {
+        if (!result.healthy) {
+          console.warn(`  - ${result.component}: ${result.issues.join(', ')}`);
+        }
+      });
+    }
+    
+    return { allHealthy, results };
+  } catch (error) {
+    console.error('健康检查执行失败:', error);
+    return { 
+      allHealthy: false, 
+      results: [{ component: 'HealthCheck', healthy: false, issues: [error.message] }] 
+    };
+  }
+}
+
 // 初始化扩展
 async function initializeExtension() {
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1秒
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`开始初始化扩展组件 (尝试 ${attempt}/${maxRetries})...`);
+      
+      // 检查 Chrome API 是否可用
+      if (!chrome || !chrome.runtime || !chrome.storage) {
+        throw new Error('Chrome API 不可用，扩展无法正常初始化');
+      }
+      
+      // 等待更长时间确保 Chrome 完全就绪
+      await new Promise(resolve => setTimeout(resolve, attempt * 200));
+      
+      // 1. 首先初始化存储管理器
+      console.log('初始化存储管理器...');
+      await storageManager.initialize();
+      
+      // 2. 初始化加密管理器
+      console.log('初始化加密管理器...');
+      await encryptionManager.initialize();
+      
+      // 3. 初始化配置管理器
+      console.log('初始化配置管理器...');
+      await configManager.initialize();
+      
+      // 4. 初始化数据处理器
+      console.log('初始化数据处理器...');
+      dataProcessor = new DataProcessor();
+      batchProcessor = new BatchProcessor(dataProcessor);
+      
+      // 5. 测试配置是否正常加载
+      const config = await configManager.getConfig();
+      console.log('配置加载成功，包含', config.feishuConfigs.length, '个飞书配置');
+      
+      // 6. 执行健康检查
+      const healthCheck = await performHealthCheck();
+      if (!healthCheck.allHealthy) {
+        console.warn('初始化完成但健康检查发现问题');
+        // 如果健康检查失败，尝试重新初始化关键组件
+        if (attempt < maxRetries) {
+          console.log('尝试重新初始化关键组件...');
+          continue;
+        }
+      }
+      
+      console.log('✅ 扩展初始化完成');
+      return; // 成功初始化，退出重试循环
+      
+    } catch (error) {
+      console.error(`扩展初始化失败 (尝试 ${attempt}/${maxRetries}):`, error);
+      
+      if (attempt === maxRetries) {
+        // 最后一次尝试失败，进入恢复模式
+        console.error('所有初始化尝试均失败，进入恢复模式...');
+        await initializeRecoveryMode();
+        return;
+      }
+      
+      // 等待后重试
+      console.log(`等待 ${retryDelay}ms 后重试...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+}
+
+// 恢复模式初始化
+async function initializeRecoveryMode() {
   try {
-    await configManager.getConfig();
-    console.log('扩展初始化完成');
+    console.log('开始恢复模式初始化...');
+    
+    // 检查最基本的 Chrome API
+    if (!chrome || !chrome.storage) {
+      console.error('Chrome API 不可用，恢复模式失败');
+      return;
+    }
+    
+    // 只初始化最基本的存储功能
+    console.log('恢复模式：初始化基本存储功能...');
+    try {
+      await storageManager.initialize();
+      console.log('✅ 恢复模式：存储管理器初始化成功');
+    } catch (storageError) {
+      console.error('恢复模式：存储管理器初始化失败', storageError);
+    }
+    
+    // 尝试初始化加密管理器
+    try {
+      await encryptionManager.initialize();
+      console.log('✅ 恢复模式：加密管理器初始化成功');
+    } catch (encryptionError) {
+      console.error('恢复模式：加密管理器初始化失败', encryptionError);
+    }
+    
+    console.log('⚠️ 恢复模式初始化完成，部分功能可能不可用');
+    
   } catch (error) {
-    console.error('扩展初始化失败:', error);
+    console.error('恢复模式初始化完全失败:', error);
   }
 }
 
 // 消息处理
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch (message.type) {
-  case 'PROCESS_NOTE_DATA':
-    handleProcessNoteData(message.data, sender).then(result => {
-      sendResponse(result);
-    }).catch(error => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  try {
+    // 首先检查基本的消息格式
+    if (!message || !message.type) {
+      sendResponse({ success: false, error: '无效的消息格式' });
+      return;
+    }
+    
+    // 确保扩展已初始化
+    await ensureExtensionInitialized();
+    
+    switch (message.type) {
+    case 'PROCESS_NOTE_DATA':
+      handleProcessNoteData(message.data, sender).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      return true;
 
   case 'BATCH_PROCESS_DATA':
     handleBatchProcessData(message.dataList).then(results => {
@@ -161,8 +337,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
 
+  case 'HEALTH_CHECK':
+    performHealthCheck().then(result => {
+      sendResponse({ success: true, ...result });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+
   default:
     sendResponse({ success: false, error: '未知的消息类型' });
+  }
+  } catch (error) {
+    console.error('消息处理失败:', error);
+    
+    // 提供更具体的错误信息
+    let errorMessage = error.message;
+    if (error.message.includes('扩展初始化失败')) {
+      errorMessage = '扩展正在初始化中，请稍后再试';
+    } else if (error.message.includes('Chrome API 不可用')) {
+      errorMessage = '浏览器API不可用，请刷新页面或重启扩展';
+    }
+    
+    sendResponse({ success: false, error: errorMessage });
   }
 });
 
@@ -171,6 +368,10 @@ async function handleProcessNoteData(data: any, sender: chrome.runtime.MessageSe
   try {
     if (!sender.tab?.url) {
       throw new Error('无法获取页面URL');
+    }
+
+    if (!dataProcessor || !batchProcessor) {
+      throw new Error('数据处理器未初始化');
     }
 
     const { noteData, files } = data;

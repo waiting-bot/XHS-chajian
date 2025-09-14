@@ -1,4 +1,5 @@
 // 缓存机制
+import { SafeStorage } from './safeStorage';
 
 // 缓存项接口
 export interface CacheItem<T = any> {
@@ -277,11 +278,9 @@ export class CacheManager {
 
   // 持久化缓存到存储
   private async persistCache(): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.storage) return;
-
     try {
       const cacheData = Array.from(this.cache.entries());
-      await chrome.storage.local.set({ app_cache: cacheData });
+      await SafeStorage.set({ app_cache: cacheData });
     } catch (error) {
       console.error('持久化缓存失败:', error);
     }
@@ -289,10 +288,8 @@ export class CacheManager {
 
   // 从存储加载缓存
   async loadPersistedCache(): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.storage) return;
-
     try {
-      const result = await chrome.storage.local.get(['app_cache']);
+      const result = await SafeStorage.get(['app_cache']);
       if (result.app_cache && Array.isArray(result.app_cache)) {
         this.cache.clear();
         
@@ -314,10 +311,8 @@ export class CacheManager {
 
   // 清除持久化的缓存
   private async clearPersistedCache(): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.storage) return;
-
     try {
-      await chrome.storage.local.remove(['app_cache']);
+      await SafeStorage.remove(['app_cache']);
     } catch (error) {
       console.error('清除持久化缓存失败:', error);
     }

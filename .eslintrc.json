@@ -1,16 +1,87 @@
 {
   "root": true,
-  "env": { "browser": true, "es2020": true },
+  "env": { 
+    "browser": true, 
+    "es2020": true,
+    "node": true
+  },
   "extends": [
     "eslint:recommended",
     "@typescript-eslint/recommended",
-    "plugin:prettier/recommended"
+    "plugin:prettier/recommended",
+    "plugin:import/recommended",
+    "plugin:import/typescript",
+    "plugin:promise/recommended"
   ],
-  "ignorePatterns": ["dist", ".eslintrc.cjs"],
+  "ignorePatterns": [
+    "dist", 
+    ".eslintrc.cjs",
+    "node_modules",
+    "coverage"
+  ],
   "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "import",
+    "promise"
+  ],
   "rules": {
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "@typescript-eslint/no-explicit-any": "warn"
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-empty-interface": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
+    
+    "import/order": ["error", {
+      "groups": [
+        "builtin",
+        "external",
+        "internal",
+        "parent",
+        "sibling",
+        "index"
+      ],
+      "newlines-between": "always"
+    }],
+    "import/no-unresolved": "off",
+    "import/namespace": "error",
+    "import/default": "error",
+    "import/no-deprecated": "warn",
+    
+    "promise/always-return": "error",
+    "promise/no-return-wrap": "error",
+    "promise/param-names": "error",
+    "promise/catch-or-return": "error",
+    "promise/no-native": "off",
+    
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-debugger": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-arrow-callback": "error",
+    "arrow-spacing": "error",
+    "object-shorthand": "error",
+    "prefer-template": "error",
+    "template-curly-spacing": "error",
+    "comma-dangle": ["error", "never"],
+    "semi": ["error", "always"],
+    "quotes": ["error", "single"],
+    "indent": ["error", 2],
+    "no-multiple-empty-lines": ["error", { "max": 1 }],
+    "eol-last": "error"
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true
+      }
+    }
   }
 }
