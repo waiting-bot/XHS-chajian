@@ -229,7 +229,7 @@ import { selectorManager } from '../config/selectors';
 
 // 主模块实例
 const pageDetector = new PageDetector();
-const dataCollector = new DataCollector(pageDetector)
+const dataCollector = new DataCollector(pageDetector);
 
 // 将选择器管理器暴露到全局作用域供数据采集器使用
 (window as any).selectorManager = selectorManager;

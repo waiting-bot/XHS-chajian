@@ -1,7 +1,8 @@
 import { DataProcessor, BatchProcessor } from '../utils/dataProcessor';
 import { fileProcessor } from '../utils/fileProcessor';
-import { configManager } from './utils/configManager';
-import { connectionTester } from './utils/connectionTester';
+import { configManager } from '../utils/configManager';
+import { connectionTester } from '../utils/connectionTester';
+import { FeishuClient } from '../api/feishu';
 
 // 初始化组件
 const dataProcessor = new DataProcessor();
@@ -154,22 +155,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   case 'PROCESS_FILES':
     handleProcessFiles(message.urls).then(result => {
-      sendResponse(result);
-    }).catch(error => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
-
-  case 'EXPORT_CONFIG':
-    handleExportConfig().then(result => {
-      sendResponse(result);
-    }).catch(error => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
-
-  case 'IMPORT_CONFIG':
-    handleImportConfig(message.configJson).then(result => {
       sendResponse(result);
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
@@ -393,8 +378,8 @@ async function handleProcessFiles(urls: string[]) {
   }
 }
 
-// 导出配置
-async function handleExportConfig() {
+// 导出配置 (deprecated)
+async function handleExportConfigLegacy() {
   try {
     const config = await dataProcessor.exportConfig();
     return { success: true, config };
@@ -404,8 +389,8 @@ async function handleExportConfig() {
   }
 }
 
-// 导入配置
-async function handleImportConfig(configJson: string) {
+// 导入配置 (deprecated)
+async function handleImportConfigLegacy(configJson: string) {
   try {
     const result = await dataProcessor.importConfig(configJson);
     return { success: result };
@@ -427,10 +412,12 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 // 错误处理
-process.on('uncaughtException', (error) => {
-  console.error('未捕获的异常:', error);
-});
+if (typeof process !== 'undefined') {
+  process.on('uncaughtException', (error) => {
+    console.error('未捕获的异常:', error);
+  });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('未处理的Promise拒绝:', reason);
-});
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('未处理的Promise拒绝:', reason);
+  });
+}

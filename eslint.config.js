@@ -7,32 +7,77 @@ import pluginTypeScript from '@typescript-eslint/eslint-plugin';
 import parserTypeScript from '@typescript-eslint/parser';
 
 export default [
-  // 1. 配置文件适用范围（可根据项目调整）
+  // 1. 全局忽略配置
   {
-    files: ['**/*.{js,jsx,ts,tsx}'], // 检查所有 JS/JSX/TS/TSX 文件
-    ignores: ['node_modules/**', 'dist/**', 'build/**'], // 忽略无需检查的目录
+    ignores: ['node_modules/**', 'dist/**', 'build/**', 'vite.config.ts'],
   },
 
-  // 2. 基础 JS 规则（继承官方推荐规则）
-  pluginJs.configs.recommended,
-
-  // 3. TypeScript 配置（如果项目使用 TS）
+  // 2. JavaScript 文件配置（包括构建后的 JS 文件）
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.js'],
     languageOptions: {
-      parser: parserTypeScript, // TS 解析器
-      parserOptions: {
-        project: './tsconfig.json', // 关联 TS 配置文件（必填）
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        chrome: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        Image: 'readonly',
+        URL: 'readonly',
+        FileReader: 'readonly',
+        crypto: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        process: 'readonly',
+        NodeJS: 'readonly',
       },
-      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      'no-undef': 'error',
+      'no-console': 'warn',
+      'no-unused-vars': 'warn',
+    },
+  },
+
+  // 3. TypeScript 源文件配置
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: parserTypeScript,
+      parserOptions: {
+        project: './tsconfig.json',
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        chrome: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        Image: 'readonly',
+        URL: 'readonly',
+        FileReader: 'readonly',
+        crypto: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        process: 'readonly',
+        NodeJS: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': pluginTypeScript,
     },
     rules: {
       ...pluginTypeScript.configs.recommended.rules,
-      // 自定义 TS 规则（示例）
-      '@typescript-eslint/no-explicit-any': 'warn', // 允许 any 类型但警告
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
     },
   },
 
@@ -51,12 +96,14 @@ export default [
     rules: {
       ...pluginReact.configs.recommended.rules,
       ...pluginReactHooks.configs.recommended.rules,
-      // 自定义 React 规则（示例）
       'react/prop-types': 'off', // 关闭 prop-types 检查（TS 项目可禁用）
     },
   },
 
-  // 5. 通用自定义规则（覆盖所有文件）
+  // 5. 基础 JS 规则（继承官方推荐规则）
+  pluginJs.configs.recommended,
+
+  // 6. 通用自定义规则（覆盖所有文件）
   {
     rules: {
       'no-console': 'warn', // 允许 console 但警告
