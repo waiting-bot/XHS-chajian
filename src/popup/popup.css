@@ -690,6 +690,21 @@ body {
   margin-bottom: var(--spacing-lg);
 }
 
+.config-selector-group {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.config-selector-group .modern-select {
+  flex: 1;
+}
+
+.config-manager-buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
 .modern-select {
   width: 100%;
   padding: var(--spacing-md);
@@ -827,6 +842,237 @@ body {
   display: none;
 }
 
+/* 配置管理面板 */
+.config-management-panel {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-gray-2);
+  background: var(--color-white);
+}
+
+.panel-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-9);
+}
+
+.panel-content {
+  padding: var(--spacing-lg);
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  background: var(--color-gray-1);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.config-item:hover {
+  background: var(--color-gray-2);
+  transform: translateY(-1px);
+}
+
+.config-item.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.config-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.config-item-name {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+}
+
+.config-item-details {
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
+}
+
+.config-item-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.config-item-actions .icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+.config-stats {
+  display: flex;
+  gap: var(--spacing-lg);
+  justify-content: space-around;
+  padding: var(--spacing-md);
+  background: var(--color-gray-1);
+  border-radius: var(--radius-md);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-6);
+  font-weight: var(--font-weight-medium);
+}
+
+.stat-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+
+/* 导入导出面板 */
+.import-export-panel {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.import-export-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-gray-1);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.export-option:hover {
+  background: var(--color-gray-2);
+  transform: translateY(-1px);
+}
+
+.export-option input[type="radio"] {
+  margin: 0;
+}
+
+.export-option-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.export-option-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+}
+
+.export-option-description {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-6);
+}
+
+.import-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.import-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--spacing-md);
+  border: 2px solid var(--color-gray-3);
+  border-radius: var(--radius-md);
+  font-family: monospace;
+  font-size: var(--font-size-sm);
+  resize: vertical;
+  transition: all var(--transition-fast);
+}
+
+.import-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.import-file-input {
+  display: none;
+}
+
+.import-file-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-gray-1);
+  border: 2px dashed var(--color-gray-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-7);
+}
+
+.import-file-label:hover {
+  background: var(--color-gray-2);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.import-password-input {
+  width: 100%;
+  padding: var(--spacing-md);
+  border: 2px solid var(--color-gray-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-fast);
+}
+
+.import-password-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
 /* 响应式设计 */
 @media (max-width: 340px) {
   :root {
@@ -844,6 +1090,31 @@ body {
   
   .editor-actions {
     flex-direction: column;
+  }
+  
+  .config-selector-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .config-manager-buttons {
+    justify-content: center;
+  }
+  
+  .config-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+  
+  .config-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .config-stats {
+    flex-direction: column;
+    gap: var(--spacing-md);
   }
 }
 

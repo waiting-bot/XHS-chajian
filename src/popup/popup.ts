@@ -1,4 +1,7 @@
 // Popup 界面交互逻辑
+import { configManager } from '../utils/configManager';
+import { connectionTester } from '../utils/connectionTester';
+
 interface NoteData {
   title: string;
   author: string;
@@ -9,14 +12,6 @@ interface NoteData {
   comments: number;
   images: number;
   videos: number;
-}
-
-interface FeishuConfig {
-  id: string;
-  name: string;
-  appId: string;
-  tableId: string;
-  accessToken: string;
 }
 
 interface UserNote {
@@ -30,19 +25,21 @@ interface UserNote {
 }
 
 class PopupManager {
-  private currentNoteData: any = null; // 保留原有类型
-  private configs: FeishuConfig[] = [];
+  private currentNoteData: any = null;
+  private configs: any[] = [];
   private currentConfigId: string = 'default';
   private noteHistory: UserNote[] = [];
   private selectedTags: Set<string> = new Set();
   private autoSaveTimer: NodeJS.Timeout | null = null;
   private isNoteSectionVisible: boolean = false;
+  private isNoteEditorVisible: boolean = false;
 
   constructor() {
     this.initializeEventListeners();
     this.loadConfigs();
     this.loadNoteHistory();
     this.checkCurrentPage();
+    this.initializeTagChips();
   }
 
   // 初始化事件监听器
@@ -74,9 +71,19 @@ class PopupManager {
       this.switchConfig((e.target as HTMLSelectElement).value);
     });
 
+    // 标签芯片事件
+    this.initializeTagChipEvents();
+
     // 监听来自content script的消息
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
+    });
+
+    // 监听配置变化
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'sync' && (changes.feishuConfigs || changes.currentConfigId)) {
+        this.loadConfigs();
+      }
     });
   }
 
@@ -169,8 +176,9 @@ class PopupManager {
       return;
     }
 
-    const config = this.getCurrentConfig();
-    if (!config) {
+    // 检查配置
+    const activeConfig = await configManager.getActiveConfig();
+    if (!activeConfig) {
       this.updateStatus('error', '请先配置飞书设置');
       return;
     }
@@ -184,10 +192,30 @@ class PopupManager {
       // 更新数据预览
       this.updateDataPreview(this.currentNoteData);
       
-      // 模拟采集和写入过程
-      await this.simulateCollection();
-      
-      this.updateStatus('success', '采集成功并写入飞书');
+      // 发送消息到background script处理数据
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab.id) {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'collectNoteData' });
+        
+        if (response && response.success) {
+          // 将数据发送到background script处理
+          const bgResponse = await chrome.runtime.sendMessage({
+            type: 'PROCESS_NOTE_DATA',
+            data: response.data,
+            sender: { tab: { url: tab.url } }
+          });
+          
+          if (bgResponse && bgResponse.success) {
+            this.updateStatus('success', '采集成功并写入飞书');
+          } else {
+            throw new Error(bgResponse?.error || '数据处理失败');
+          }
+        } else {
+          throw new Error(response?.error || '数据采集失败');
+        }
+      } else {
+        throw new Error('无法获取当前标签页');
+      }
     } catch (error) {
       this.updateStatus('error', '采集失败: ' + (error as Error).message);
     } finally {
@@ -196,13 +224,30 @@ class PopupManager {
     }
   }
 
-  // 添加备注
-  private addNote(): void {
-    const note = prompt('请输入备注信息:');
-    if (note) {
-      // 这里可以实现备注保存逻辑
-      this.updateStatus('success', '✅ 备注已保存');
-    }
+  // 初始化标签芯片
+  private initializeTagChips(): void {
+    const tagChips = document.querySelectorAll('.tag-chip');
+    tagChips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        const tagText = (e.target as HTMLElement).getAttribute('data-tag');
+        if (tagText) {
+          this.toggleTag(tagText);
+        }
+      });
+    });
+  }
+
+  // 初始化标签芯片事件
+  private initializeTagChipEvents(): void {
+    const tagChips = document.querySelectorAll('.tag-chip');
+    tagChips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        const tagText = (e.target as HTMLElement).getAttribute('data-tag');
+        if (tagText) {
+          this.toggleTag(tagText);
+        }
+      });
+    });
   }
 
   // 更新数据预览
@@ -288,22 +333,17 @@ class PopupManager {
   // 加载配置
   private async loadConfigs(): Promise<void> {
     try {
-      const result = await chrome.storage.sync.get(['feishuConfigs', 'currentConfigId']);
-      this.configs = result.feishuConfigs || [
-        {
-          id: 'default',
-          name: '默认配置',
-          appId: '',
-          tableId: '',
-          accessToken: ''
-        }
-      ];
-      this.currentConfigId = result.currentConfigId || 'default';
+      // 使用新的ConfigManager加载配置
+      const configData = await configManager.getConfig();
+      this.configs = configData.feishuConfigs || [];
+      this.currentConfigId = configData.activeConfigId || 'default';
       
       this.updateConfigSelector();
       this.loadCurrentConfig();
+      this.updateConnectionStatus();
     } catch (error) {
       console.error('加载配置失败:', error);
+      this.updateStatus('error', '配置加载失败');
     }
   }
 
@@ -312,13 +352,18 @@ class PopupManager {
     const configSelect = document.getElementById('configSelect') as HTMLSelectElement;
     if (!configSelect) return;
 
+    if (this.configs.length === 0) {
+      configSelect.innerHTML = '<option value="">暂无配置</option>';
+      return;
+    }
+
     configSelect.innerHTML = this.configs.map(config => 
       `<option value="${config.id}" ${config.id === this.currentConfigId ? 'selected' : ''}>${config.name}</option>`
     ).join('');
   }
 
   // 加载当前配置
-  private loadCurrentConfig(): void {
+  private async loadCurrentConfig(): Promise<void> {
     const config = this.getCurrentConfig();
     if (!config) return;
 
@@ -326,25 +371,34 @@ class PopupManager {
     const tableIdInput = document.getElementById('tableId') as HTMLInputElement;
     const accessTokenInput = document.getElementById('accessToken') as HTMLInputElement;
 
-    if (appIdInput) appIdInput.value = config.appId;
-    if (tableIdInput) tableIdInput.value = config.tableId;
-    if (accessTokenInput) accessTokenInput.value = config.accessToken;
+    if (appIdInput) appIdInput.value = config.appId || '';
+    if (tableIdInput) tableIdInput.value = config.tableId || '';
+    if (accessTokenInput) accessTokenInput.value = config.accessToken || '';
   }
 
   // 获取当前配置
-  private getCurrentConfig(): FeishuConfig | null {
+  private getCurrentConfig(): any {
     return this.configs.find(config => config.id === this.currentConfigId) || null;
   }
 
   // 切换配置
-  private switchConfig(configId: string): void {
-    this.currentConfigId = configId;
-    this.loadCurrentConfig();
-    chrome.storage.sync.set({ currentConfigId: configId });
+  private async switchConfig(configId: string): Promise<void> {
+    try {
+      await configManager.setActiveConfig(configId);
+      this.currentConfigId = configId;
+      this.loadCurrentConfig();
+      this.updateConnectionStatus();
+    } catch (error) {
+      console.error('切换配置失败:', error);
+      this.updateStatus('error', '切换配置失败');
+    }
   }
 
   // 保存配置
   private async saveConfig(): Promise<void> {
+    const name = prompt('请输入配置名称:');
+    if (!name) return;
+
     const appId = (document.getElementById('appId') as HTMLInputElement).value.trim();
     const tableId = (document.getElementById('tableId') as HTMLInputElement).value.trim();
     const accessToken = (document.getElementById('accessToken') as HTMLInputElement).value.trim();
@@ -354,27 +408,26 @@ class PopupManager {
       return;
     }
 
-    // 验证配置格式
-    if (!this.validateConfig(appId, tableId, accessToken)) {
-      this.updateStatus('error', '❌ 配置格式不正确');
-      return;
-    }
-
-    const configIndex = this.configs.findIndex(config => config.id === this.currentConfigId);
-    if (configIndex >= 0) {
-      this.configs[configIndex] = {
-        ...this.configs[configIndex],
+    try {
+      // 使用ConfigManager创建配置
+      const config = {
+        name,
         appId,
         tableId,
-        accessToken
+        accessToken,
+        baseUrl: 'https://open.feishu.cn',
+        isActive: true
       };
-    }
 
-    try {
-      await chrome.storage.sync.set({ feishuConfigs: this.configs });
-      this.updateStatus('success', '✅ 配置已保存');
+      const result = await configManager.createFeishuConfig(config);
+      if (result.success) {
+        await this.loadConfigs(); // 重新加载配置
+        this.updateStatus('success', '✅ 配置已保存');
+      } else {
+        throw new Error(result.error || '配置保存失败');
+      }
     } catch (error) {
-      this.updateStatus('error', '❌ 配置保存失败');
+      this.updateStatus('error', '❌ 配置保存失败: ' + (error as Error).message);
     }
   }
 
@@ -392,35 +445,51 @@ class PopupManager {
       return;
     }
 
-    const testBtn = document.getElementById('testConnectionBtn') as HTMLButtonElement;
+    const testBtn = document.getElementById('testConnection') as HTMLButtonElement;
     const originalText = testBtn.textContent;
     testBtn.textContent = '🔄 测试中...';
     testBtn.disabled = true;
 
     try {
-      // 这里实现实际的飞书API测试
-      await this.simulateConnectionTest();
-      this.updateStatus('success', '✅ 连接测试成功');
+      // 使用ConnectionTester测试连接
+      const result = await connectionTester.testConnection(config);
+      if (result.success) {
+        this.updateStatus('success', '✅ 连接测试成功');
+      } else {
+        throw new Error(result.error || '连接测试失败');
+      }
     } catch (error) {
-      this.updateStatus('error', '❌ 连接测试失败');
+      this.updateStatus('error', '❌ 连接测试失败: ' + (error as Error).message);
     } finally {
       testBtn.textContent = originalText;
       testBtn.disabled = false;
     }
   }
 
-  // 模拟连接测试
-  private simulateConnectionTest(): Promise<void> {
-    return new Promise((resolve, reject) => {
+  // 显示备注编辑器
+  private showNoteEditor(): void {
+    const noteEditor = document.getElementById('noteEditor');
+    if (noteEditor) {
+      noteEditor.style.display = 'block';
+      this.isNoteEditorVisible = true;
+      
+      // 聚焦到输入框
       setTimeout(() => {
-        // 模拟80%成功率
-        if (Math.random() > 0.2) {
-          resolve();
-        } else {
-          reject(new Error('连接超时'));
+        const noteInput = document.getElementById('noteInput') as HTMLTextAreaElement;
+        if (noteInput) {
+          noteInput.focus();
         }
-      }, 1500);
-    });
+      }, 100);
+    }
+  }
+
+  // 关闭备注编辑器
+  private closeNoteEditor(): void {
+    const noteEditor = document.getElementById('noteEditor');
+    if (noteEditor) {
+      noteEditor.style.display = 'none';
+      this.isNoteEditorVisible = false;
+    }
   }
 
   // 刷新令牌
@@ -430,6 +499,44 @@ class PopupManager {
     if (newToken) {
       accessTokenInput.value = newToken;
       this.updateStatus('success', '✅ 令牌已更新');
+    }
+  }
+
+  // 更新连接状态
+  private async updateConnectionStatus(): Promise<void> {
+    try {
+      const config = this.getCurrentConfig();
+      const connectionStatus = document.getElementById('connectionStatus');
+      
+      if (connectionStatus) {
+        if (config && config.accessToken) {
+          const result = await connectionTester.testConnection(config);
+          if (result.success) {
+            connectionStatus.innerHTML = '
+              <div class="status-dot online"></div>
+              <span>已连接</span>
+            ';
+          } else {
+            connectionStatus.innerHTML = '
+              <div class="status-dot offline"></div>
+              <span>连接失败</span>
+            ';
+          }
+        } else {
+          connectionStatus.innerHTML = '
+            <div class="status-dot offline"></div>
+            <span>未连接</span>
+          ';
+        }
+      }
+    } catch (error) {
+      const connectionStatus = document.getElementById('connectionStatus');
+      if (connectionStatus) {
+        connectionStatus.innerHTML = '
+          <div class="status-dot offline"></div>
+          <span>连接异常</span>
+        ';
+      }
     }
   }
 
@@ -708,7 +815,7 @@ class PopupManager {
     });
 
     // 创建备注对象
-    const note: NoteData = {
+    const note: UserNote = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       content,
       category,
@@ -955,6 +1062,58 @@ function saveConfig(): void {
   const manager = (window as any).popupManager;
   if (manager) {
     manager.saveConfig();
+  }
+}
+
+// 显示备注编辑器
+function showNoteEditor(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.showNoteEditor();
+  }
+}
+
+// 关闭备注编辑器
+function closeNoteEditor(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.closeNoteEditor();
+  }
+}
+
+// 配置管理相关函数
+function createNewConfig(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.createNewConfig();
+  }
+}
+
+function exportConfig(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.exportConfig();
+  }
+}
+
+function importConfig(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.importConfig();
+  }
+}
+
+function closeConfigManagement(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.closeConfigManagement();
+  }
+}
+
+function closeImportExport(): void {
+  const manager = (window as any).popupManager;
+  if (manager) {
+    manager.closeImportExport();
   }
 }
 

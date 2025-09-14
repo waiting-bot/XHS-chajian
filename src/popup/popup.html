@@ -235,12 +235,41 @@
         <div class="card-content" id="configContent">
           <div class="config-selector">
             <label class="selector-label">配置文件</label>
-            <select class="modern-select" id="configSelect">
-              <option value="default">默认配置</option>
-            </select>
+            <div class="config-selector-group">
+              <select class="modern-select" id="configSelect">
+                <option value="">暂无配置</option>
+              </select>
+              <div class="config-manager-buttons">
+                <button class="icon-button" onclick="createNewConfig()" title="新建配置">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+                <button class="icon-button" onclick="exportConfig()" title="导出配置">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
+                <button class="icon-button" onclick="importConfig()" title="导入配置">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
           
           <div class="config-form">
+            <div class="form-field">
+              <label class="field-label">配置名称</label>
+              <input type="text" class="modern-input" id="configName" placeholder="我的飞书配置">
+            </div>
+            
             <div class="form-field">
               <label class="field-label">App ID</label>
               <input type="text" class="modern-input" id="appId" placeholder="cli_a1b2c3d4...">
@@ -285,6 +314,55 @@
                 <span class="button-text">保存配置</span>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 配置管理面板 -->
+      <div class="config-management-panel" id="configManagementPanel" style="display: none;">
+        <div class="panel-header">
+          <h3 class="panel-title">配置管理</h3>
+          <button class="close-button" onclick="closeConfigManagement()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="panel-content">
+          <div class="config-list" id="configList">
+            <!-- 动态生成的配置列表 -->
+          </div>
+          
+          <div class="config-stats">
+            <div class="stat-item">
+              <span class="stat-label">总配置数:</span>
+              <span class="stat-value" id="totalConfigs">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">活动配置:</span>
+              <span class="stat-value" id="activeConfigs">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 导入导出面板 -->
+      <div class="import-export-panel" id="importExportPanel" style="display: none;">
+        <div class="panel-header">
+          <h3 class="panel-title" id="importExportTitle">导入配置</h3>
+          <button class="close-button" onclick="closeImportExport()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="panel-content">
+          <div class="import-export-content" id="importExportContent">
+            <!-- 动态生成的内容 -->
           </div>
         </div>
       </div>
