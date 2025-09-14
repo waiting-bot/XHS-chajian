@@ -1,6 +1,11 @@
 // Popup 界面交互逻辑
 import { configManager } from '../utils/configManager';
 import { connectionTester } from '../utils/connectionTester';
+import { errorNotificationManager, showError, showWarning, showSuccess, showInfo } from '../utils/errorNotification';
+import { errorDetailsManager } from '../utils/errorDetails';
+import { errorManager } from '../utils/errorManager';
+import { initializeLogging, logManager } from '../utils/logManager';
+import { initializeRecovery, recoveryManager } from '../utils/recoveryManager';
 
 interface NoteData {
   title: string;
@@ -35,11 +40,69 @@ class PopupManager {
   private isNoteEditorVisible: boolean = false;
 
   constructor() {
+    this.initializeErrorHandling();
     this.initializeEventListeners();
     this.loadConfigs();
     this.loadNoteHistory();
     this.checkCurrentPage();
     this.initializeTagChips();
+  }
+
+  // 初始化错误处理
+  private async initializeErrorHandling(): Promise<void> {
+    try {
+      // 初始化错误处理系统
+      await initializeLogging();
+      await initializeRecovery();
+      
+      // 注册错误监听器
+      errorManager.addEventListener(this.handleGlobalError.bind(this));
+      
+      // 设置通知配置
+      errorNotificationManager.updateConfig({
+        duration: 5000,
+        maxNotifications: 3,
+        position: 'top-right',
+        enableSound: false,
+        enableDesktop: false,
+        showDetails: true
+      });
+
+      // 启动性能监控
+      const { performanceMonitor } = await import('../utils/performanceMonitor');
+      performanceMonitor.startMonitoring();
+
+      // 初始化缓存系统
+      const { initializeCache } = await import('../utils/cacheManager');
+      await initializeCache();
+      
+      console.log('错误处理系统初始化完成');
+      showSuccess('系统初始化', '所有错误处理和性能监控系统已启动');
+    } catch (error) {
+      console.error('错误处理系统初始化失败:', error);
+      showError('初始化失败', '系统初始化过程中发生错误', error);
+    }
+  }
+
+  // 处理全局错误
+  private handleGlobalError(error: any): void {
+    console.log('捕获到全局错误:', error);
+    
+    // 根据错误类型显示相应的通知
+    if (error.level === 'critical' || error.level === 'error') {
+      const notificationId = showError(error.type || '系统错误', error.message, error);
+      
+      // 为严重错误添加查看详情动作
+      if (error.level === 'critical') {
+        setTimeout(() => {
+          errorDetailsManager.showErrorDetails(error);
+        }, 1000);
+      }
+    } else if (error.level === 'warning') {
+      showWarning(error.type || '警告', error.message, error);
+    } else {
+      showInfo(error.type || '提示', error.message, error);
+    }
   }
 
   // 初始化事件监听器
@@ -144,6 +207,11 @@ class PopupManager {
         indicatorDot.className = `indicator-dot ${type}`;
         statusText.textContent = message;
       }
+    }
+    
+    // 对于错误状态，同时显示通知
+    if (type === 'error') {
+      showError('操作失败', message);
     }
   }
 
