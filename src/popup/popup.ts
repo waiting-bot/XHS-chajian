@@ -1,7 +1,7 @@
 // DOM 元素
 const collectBtn = document.getElementById('collectBtn') as HTMLButtonElement
 const configBtn = document.getElementById('configBtn') as HTMLButtonElement
-const status = document.getElementById('status') as HTMLDivElement
+const statusDiv = document.getElementById('status') as HTMLDivElement
 
 // 检查当前标签页是否为小红书笔记页面
 async function checkCurrentPage() {
@@ -24,7 +24,7 @@ async function checkCurrentPage() {
 
 // 更新状态显示
 function updateStatus(message: string, isSuccess: boolean = false) {
-  const statusEl = status.querySelector('p')
+  const statusEl = statusDiv.querySelector('p')
   if (statusEl) {
     statusEl.textContent = message
     statusEl.style.color = isSuccess ? '#28a745' : '#666'
