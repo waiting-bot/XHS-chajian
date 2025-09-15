@@ -52,4 +52,8 @@ export default defineConfig({
       },
     },
   ],
+  // 禁用内容脚本的HMR（开发时）
+  server: {
+    hmr: false
+  }
 })
