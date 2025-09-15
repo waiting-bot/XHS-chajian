@@ -133,12 +133,37 @@
 
     private checkPageReadiness(): void {
       try {
-        const contentElements = document.querySelectorAll('.note-detail')
-        const hasContentLoaded = contentElements.length > 0
+        // 更灵活的页面就绪检测 - 检查多种可能的元素
+        const selectors = [
+          '.note-detail',
+          '[class*="note"]',
+          '[class*="detail"]',
+          '[class*="content"]',
+          '[class*="article"]',
+          'main',
+          '[role="main"]'
+        ]
+        
+        let hasContentLoaded = false
+        for (const selector of selectors) {
+          const elements = document.querySelectorAll(selector)
+          if (elements.length > 0) {
+            hasContentLoaded = true
+            console.log(`[Content] 找到页面元素: ${selector}, 数量: ${elements.length}`)
+            break
+          }
+        }
 
-        if (hasContentLoaded && this.pageStatus.status === 'loading') {
+        // 检查页面是否有足够的内容
+        const bodyText = document.body?.innerText || ''
+        const hasContent = bodyText.length > 100 // 至少100个字符
+
+        if ((hasContentLoaded || hasContent) && this.pageStatus.status === 'loading') {
+          console.log('[Content] 页面已就绪，状态更新为ready')
           this.pageStatus.status = 'ready'
           this.sendPageStatus()
+        } else if (this.pageStatus.status === 'loading') {
+          console.log('[Content] 页面仍在加载中...')
         }
       } catch (error) {
         console.error('检查页面就绪状态失败:', error)
@@ -207,6 +232,7 @@
           likes: likes || 0,
           collects: collects || 0,
           comments: comments || 0,
+          sourceUrl: window.location.href,
         }
       } catch (error) {
         console.error('采集笔记数据失败:', error)
@@ -315,6 +341,9 @@
   // 消息处理函数
   function handleMessage(message, _sender, sendResponse) {
     switch (message.type) {
+      case 'ping':
+        sendResponse({ pong: true })
+        break
       case 'GET_PAGE_STATUS':
         sendResponse({ status: pageDetector.getPageStatus() })
         break
@@ -327,18 +356,20 @@
             message: '当前页面不是小红书笔记',
           })
           sendResponse({ success: false, error: '当前页面不是小红书笔记' })
-          return
+          return true // 保持消息通道开放
         }
 
         dataCollector
           .collectNoteData()
           .then(data => {
+            console.log('[Content] 数据采集成功:', data)
             sendResponse({ success: true, data })
           })
           .catch(error => {
+            console.error('[Content] 数据采集失败:', error)
             sendResponse({ success: false, error: error.message })
           })
-        return true
+        return true // 保持消息通道开放用于异步响应
       case 'GET_NOTE_ID':
         sendResponse({ noteId: pageDetector.getNoteId() })
         break

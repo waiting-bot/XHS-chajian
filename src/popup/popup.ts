@@ -67,9 +67,17 @@ class PopupManager {
   }
   private currentEditingConfig: FeishuConfig | null = null
   private configs: Record<string, FeishuConfig> = {}
+  private static instance: PopupManager | null = null
+  private monitoringIntervals: NodeJS.Timeout[] = []
 
   constructor() {
     console.log('[PopupManager] PopupManager 实例被创建')
+    // 防止重复初始化
+    if (PopupManager.instance) {
+      console.warn('[PopupManager] 检测到重复初始化，清理之前的实例')
+      this.cleanup()
+    }
+    PopupManager.instance = this
     this.initialize()
   }
 
@@ -147,6 +155,7 @@ class PopupManager {
     
     // 调试按钮
     document.getElementById('debug-storage')?.addEventListener('click', () => this.debugStorage())
+    document.getElementById('test-config')?.addEventListener('click', () => this.testFeishuConfig())
     
     // 窗口控制按钮
     document.getElementById('closeWindowBtn')?.addEventListener('click', () => this.closeWindow())
@@ -169,11 +178,33 @@ class PopupManager {
   }
 
   private startStatusMonitoring() {
-    // 定期更新页面状态
-    setInterval(() => this.updatePageStatus(), 3000)
+    // 清理旧的定时器
+    this.cleanupIntervals()
     
-    // 定期更新配置状态
-    setInterval(() => this.updateConfigStatus(), 10000)
+    // 使用单个定时器更新所有状态
+    const interval = setInterval(async () => {
+      await this.updatePageStatus()
+      // 每3次页面状态更新检查一次配置状态
+      if (Date.now() % 9 === 0) {
+        await this.updateConfigStatus()
+      }
+    }, 3000)
+    
+    this.monitoringIntervals.push(interval)
+    console.log('[PopupManager] 状态监控已启动')
+  }
+
+  private cleanupIntervals() {
+    this.monitoringIntervals.forEach(interval => {
+      clearInterval(interval)
+    })
+    this.monitoringIntervals = []
+  }
+
+  private cleanup() {
+    console.log('[PopupManager] 清理资源...')
+    this.cleanupIntervals()
+    // 清理事件监听器（如果需要）
   }
 
   // 配置状态管理
@@ -182,13 +213,32 @@ class PopupManager {
       return new Promise((resolve) => {
         chrome.storage.sync.get([
           'feishuTableUrl', 
+          'feishuSpreadsheetUrl',
           'feishuAppSecret',
-          'feishuAppId'
+          'feishuAppId',
+          'feishuAppToken',
+          'feishuTableId'
         ], (result) => {
-          const hasTableUrl = !!result.feishuTableUrl
+          // 兼容多种键名
+          const tableUrl = result.feishuSpreadsheetUrl || result.feishuTableUrl
+          const hasTableUrl = !!tableUrl
           const hasAppId = !!result.feishuAppId
           const hasAppSecret = !!result.feishuAppSecret
-          const isConfigured = hasTableUrl && hasAppId && hasAppSecret
+          const hasAppToken = !!result.feishuAppToken
+          const hasTableId = !!result.feishuTableId
+          
+          // 多种验证方式：新的token方式或传统的URL+AppSecret方式
+          const isConfigured = (hasAppToken && hasTableId) || (hasTableUrl && hasAppId && hasAppSecret)
+          
+          console.log('[PopupManager] 配置状态检查:', {
+            tableUrl: tableUrl?.substring(0, 50) + '...',
+            hasTableUrl,
+            hasAppId,
+            hasAppSecret,
+            hasAppToken,
+            hasTableId,
+            isConfigured
+          })
           
           this.configStatus = {
             isConfigured,
@@ -359,7 +409,7 @@ class PopupManager {
       
       // 向content script发送消息获取数据，带重试机制
       const response = await this.retryOperation(
-        () => this.sendMessageToContentScript(tab.id, { type: 'collectData' }),
+        () => this.sendMessageToContentScript(tab.id, { type: 'COLLECT_NOTE_DATA' }),
         '数据采集',
         3, // 最多重试3次
         1000 // 重试间隔1秒
@@ -401,24 +451,7 @@ class PopupManager {
     }
   }
 
-  // 向content script发送消息
-  private async sendMessageToContentScript(tabId: number, message: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('消息发送超时'))
-      }, 5000)
-
-      chrome.tabs.sendMessage(tabId, message, (response) => {
-        clearTimeout(timeout)
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message))
-        } else {
-          resolve(response)
-        }
-      })
-    })
-  }
-
+  
   // 重试操作
   private async retryOperation<T>(
     operation: () => Promise<T>,
@@ -985,13 +1018,14 @@ class PopupManager {
       this.collectionState.progress = 0
       
       this.updateButtonStates()
-      this.updateFooterStatus('正在采集数据...')
-      
-      // 模拟采集过程
-      this.simulateCollection()
       
       this.showNotification('开始采集', '正在采集笔记数据...', 'info')
+      
+      // 开始真正的数据采集和飞书写入
+      await this.performRealCollection()
+      
     } catch (error) {
+      console.error('采集过程失败:', error)
       this.showNotification('采集失败', error.message, 'error')
       this.resetCollectionState()
     }
@@ -1000,7 +1034,6 @@ class PopupManager {
   private pauseCollection() {
     this.collectionState.isPaused = !this.collectionState.isPaused
     this.updateButtonStates()
-    this.updateFooterStatus(this.collectionState.isPaused ? '采集已暂停' : '正在采集数据...')
     
     this.showNotification(
       this.collectionState.isPaused ? '暂停采集' : '恢复采集', 
@@ -1028,31 +1061,55 @@ class PopupManager {
     }
   }
 
-  private async simulateCollection() {
-    const steps = [
-      { progress: 20, message: '正在解析页面结构...' },
-      { progress: 40, message: '正在提取文本内容...' },
-      { progress: 60, message: '正在处理媒体文件...' },
-      { progress: 80, message: '正在上传到飞书...' },
-      { progress: 100, message: '采集完成！' }
-    ]
-    
-    for (const step of steps) {
-      if (!this.collectionState.isCollecting) break
-      
-      while (this.collectionState.isPaused) {
-        await new Promise(resolve => setTimeout(resolve, 100))
+  private async performRealCollection() {
+    try {
+      const [tab] = await chrome.tabs.query({active: true, currentWindow: true})
+      if (!tab || !tab.id) {
+        throw new Error('无法获取当前标签页信息')
       }
       
-      this.collectionState.progress = step.progress
-      this.updateFooterStatus(step.message)
+      // 向content script发送消息获取数据
+      const collectResponse = await this.sendMessageToContentScript(tab.id, { type: 'COLLECT_NOTE_DATA' })
       
-      await new Promise(resolve => setTimeout(resolve, 800))
-    }
-    
-    if (this.collectionState.isCollecting) {
+      if (!collectResponse.success || !collectResponse.data) {
+        throw new Error(collectResponse.error || '数据采集失败')
+      }
+      
+      const noteData = collectResponse.data
+      
+      // 验证数据完整性
+      if (!noteData.title || !noteData.author) {
+        throw new Error('采集的数据不完整，缺少标题或作者信息')
+      }
+      
+      // 处理文件
+      const files = []
+      if (noteData.images && noteData.images.length > 0) {
+        files.push(...noteData.images.map(url => ({ type: 'image', url })))
+      }
+      if (noteData.video) {
+        files.push({ type: 'video', url: noteData.video })
+      }
+      
+      // 调用background script处理飞书写入
+      const backgroundResponse = await chrome.runtime.sendMessage({
+        type: 'PROCESS_NOTE_DATA',
+        data: { noteData, files }
+      })
+      
+      if (!backgroundResponse.success) {
+        throw new Error(backgroundResponse.error || '飞书写入失败')
+      }
+      
+      // 完成
       this.resetCollectionState()
       this.showNotification('采集完成', '数据已成功写入飞书表格', 'success')
+      
+    } catch (error) {
+      console.error('采集过程失败:', error)
+      this.resetCollectionState()
+      this.showNotification('采集失败', error.message, 'error')
+      throw error
     }
   }
 
@@ -1063,7 +1120,6 @@ class PopupManager {
       progress: 0
     }
     this.updateButtonStates()
-    this.updateFooterStatus('就绪')
   }
 
   // UI 更新方法
@@ -1231,6 +1287,41 @@ class PopupManager {
     }, 1000)
   }
 
+  // 向content script发送消息的方法
+  private async sendMessageToContentScript(tabId: number, message: any): Promise<any> {
+    try {
+      console.log('[Popup] 向content script发送消息:', message, '标签页ID:', tabId)
+      
+      // 首先尝试直接发送消息
+      const response = await chrome.tabs.sendMessage(tabId, message)
+      console.log('[Popup] 收到content script响应:', response)
+      return response
+    } catch (error) {
+      console.error('[Popup] 直接发送消息失败，尝试注入content script:', error)
+      
+      try {
+        // 如果直接发送失败，尝试动态注入content script
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['/content/content.js']
+        })
+        
+        console.log('[Popup] Content script注入成功，重新发送消息')
+        
+        // 等待一下让script加载
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // 重新发送消息
+        const response = await chrome.tabs.sendMessage(tabId, message)
+        console.log('[Popup] 重新发送消息后收到响应:', response)
+        return response
+      } catch (injectError) {
+        console.error('[Popup] Content script注入也失败:', injectError)
+        throw new Error('无法与页面通信，请确保当前页面是小红书笔记页面')
+      }
+    }
+  }
+
   // 强制显示模态框的调试方法
   private debugForceShowModal() {
     console.log('[Debug] 强制显示模态框')
@@ -1332,6 +1423,73 @@ ${configCount === 0 ?
     }
   }
 
+  // 测试飞书配置
+  private async testFeishuConfig() {
+    console.log('[Test] 开始测试飞书配置...')
+    
+    try {
+      // 兼容多种键名格式
+      const result = await chrome.storage.sync.get(['feishuSpreadsheetUrl', 'feishuTableUrl', 'feishuAppId', 'feishuAppSecret', 'feishuAppToken', 'feishuTableId'])
+      
+      // 兼容处理键名
+      const tableUrl = result.feishuSpreadsheetUrl || result.feishuTableUrl
+      const appId = result.feishuAppId
+      const appSecret = result.feishuAppSecret
+      const appToken = result.feishuAppToken
+      const tableId = result.feishuTableId
+      
+      console.log('[Test] 当前配置:', {
+        hasTableUrl: !!tableUrl,
+        hasAppId: !!appId,
+        hasAppSecret: !!appSecret,
+        hasAppToken: !!appToken,
+        hasTableId: !!tableId,
+        tableUrl: tableUrl?.substring(0, 50) + '...'
+      })
+
+      // 验证配置完整性 - 支持多种配置方式
+      if (!tableUrl) {
+        throw new Error('未配置飞书表格URL')
+      }
+
+      if (!appId || !appSecret) {
+        throw new Error('未配置飞书应用ID或应用密钥')
+      }
+
+      // 构建兼容性配置对象
+      const compatibleConfig = {
+        feishuTableUrl: tableUrl,
+        feishuSpreadsheetUrl: tableUrl,
+        feishuAppId: appId,
+        feishuAppSecret: appSecret,
+        feishuAppToken: appToken,
+        feishuTableId: tableId
+      }
+
+      // 测试background script的配置读取
+      console.log('[Test] 发送配置测试请求...')
+      const testResponse = await chrome.runtime.sendMessage({
+        type: 'TEST_CONFIG',
+        config: compatibleConfig
+      })
+
+      console.log('[Test] 收到配置测试响应:', testResponse)
+
+      if (!testResponse) {
+        throw new Error('Background script未响应，请重新加载扩展')
+      }
+
+      if (testResponse.success) {
+        this.showNotification('配置测试成功', '飞书配置正确，可以开始采集', 'success')
+      } else {
+        throw new Error(testResponse.error || '配置测试失败')
+      }
+    } catch (error) {
+      console.error('[Test] 配置测试失败:', error)
+      this.showNotification('配置测试失败', error.message, 'error')
+    }
+  }
+
   // 关闭窗口
   private closeWindow() {
     console.log('[PopupManager] 关闭窗口')
@@ -1343,8 +1501,14 @@ ${configCount === 0 ?
   }
 }
 
-// 初始化应用
+// 初始化应用 - 确保只创建一个实例
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[Popup] DOM内容已加载，开始初始化PopupManager')
-  new PopupManager()
+  
+  // 防止重复初始化
+  if (!(window as any).popupManagerInstance) {
+    (window as any).popupManagerInstance = new PopupManager()
+  } else {
+    console.log('[Popup] PopupManager已存在，跳过重复初始化')
+  }
 })
