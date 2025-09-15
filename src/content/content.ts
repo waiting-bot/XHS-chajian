@@ -6,6 +6,20 @@
   if (window.hasRunXhsChajianContentScript) return;
   window.hasRunXhsChajianContentScript = true;
 
+  // 侧边栏相关常量
+  const SIDEPANEL_ID = 'xhs-chajian-sidepanel-iframe';
+  const SIDEPANEL_STYLE = `
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100vh;
+    border: none;
+    z-index: 9999999;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    background: white;
+  `;
+
     // 接口定义
   interface PageInfo {
     isNotePage: boolean
@@ -340,9 +354,20 @@
 
   // 消息处理函数
   function handleMessage(message, _sender, sendResponse) {
+    // 处理来自 background 的 action 格式消息
+    if (message.action === 'TOGGLE_SIDE_PANEL') {
+      toggleSidePanel()
+      sendResponse({ success: true })
+      return true
+    }
+    
     switch (message.type) {
       case 'ping':
         sendResponse({ pong: true })
+        break
+      case 'TOGGLE_SIDE_PANEL':
+        toggleSidePanel()
+        sendResponse({ success: true })
         break
       case 'GET_PAGE_STATUS':
         sendResponse({ status: pageDetector.getPageStatus() })
@@ -402,6 +427,25 @@
   window.addEventListener('error', (event) => {
     console.error('内容脚本错误:', event.error);
   });
+
+  // 侧边栏管理功能
+  function toggleSidePanel() {
+    const existingPanel = document.getElementById(SIDEPANEL_ID);
+    if (existingPanel) {
+      // 如果侧边栏已存在，则移除它
+      existingPanel.remove();
+    } else {
+      // 如果不存在，则创建并注入
+      const iframe = document.createElement('iframe');
+      iframe.id = SIDEPANEL_ID;
+      iframe.src = chrome.runtime.getURL('popup.html');
+      
+      // 应用样式
+      iframe.style.cssText = SIDEPANEL_STYLE;
+      
+      document.body.appendChild(iframe);
+    }
+  }
 
   // 初始化逻辑
   chrome.runtime.onMessage.addListener(handleMessage);

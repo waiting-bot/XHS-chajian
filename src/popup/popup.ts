@@ -1362,23 +1362,28 @@ class PopupManager {
       // 计算配置数量 - 检查多种可能的配置键名
       let configCount = 0
       let configSource = ''
+      let configDetails = ''
       
       if (syncData.feishuConfigs) {
         const configs = typeof syncData.feishuConfigs === 'string' ? 
           JSON.parse(syncData.feishuConfigs) : syncData.feishuConfigs
         configCount = Object.keys(configs).length
         configSource = 'feishuConfigs (sync)'
+        configDetails = JSON.stringify(configs, null, 2)
       } else if (localData.feishuConfigs) {
         const configs = typeof localData.feishuConfigs === 'string' ? 
           JSON.parse(localData.feishuConfigs) : localData.feishuConfigs
         configCount = Object.keys(configs).length
         configSource = 'feishuConfigs (local)'
+        configDetails = JSON.stringify(configs, null, 2)
       } else if (syncData.CONFIG_LIST) {
         configCount = Array.isArray(syncData.CONFIG_LIST) ? syncData.CONFIG_LIST.length : 0
         configSource = 'CONFIG_LIST (sync)'
+        configDetails = JSON.stringify(syncData.CONFIG_LIST, null, 2)
       } else if (localData.CONFIG_LIST) {
         configCount = Array.isArray(localData.CONFIG_LIST) ? localData.CONFIG_LIST.length : 0
         configSource = 'CONFIG_LIST (local)'
+        configDetails = JSON.stringify(localData.CONFIG_LIST, null, 2)
       }
       
       // 显示详细汇总信息
@@ -1413,6 +1418,13 @@ ${configCount === 0 ?
 
 📱 详细存储数据请查看浏览器控制台 (F12)
       `
+      
+      // 在控制台中输出配置详情
+      if (configDetails) {
+        console.log('--- 配置详情 ---')
+        console.log(configDetails)
+        console.log('-----------------')
+      }
       
       alert(summary)
       

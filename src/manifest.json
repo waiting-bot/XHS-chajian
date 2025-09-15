@@ -24,7 +24,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/popup/popup.html"],
+      "resources": ["popup.html"],
       "matches": ["*://*.xiaohongshu.com/*"]
     }
   ],

@@ -1,30 +1,14 @@
 // 飞书API集成的background script
 chrome.action.onClicked.addListener(async (tab) => {
   try {
-    // 查找已存在的窗口
-    const windows = await chrome.windows.getAll({
-      windowTypes: ['popup']
-    });
-    
-    const existingWindow = windows.find(window => 
-      window.title && window.title.includes('小红书笔记采集器')
-    );
-    
-    if (existingWindow) {
-      // 如果窗口已存在，聚焦它
-      await chrome.windows.update(existingWindow.id, { focused: true });
-    } else {
-      // 创建新窗口
-      await chrome.windows.create({
-        url: chrome.runtime.getURL('src/popup/popup.html'),
-        type: 'popup',
-        width: 420,
-        height: 650,
-        focused: true
+    // 当用户点击插件图标时，向当前激活的标签页的 content script 发送消息
+    if (tab.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: "TOGGLE_SIDE_PANEL"
       });
     }
   } catch (error) {
-    console.error('打开popup窗口失败:', error);
+    console.error('发送侧边栏切换消息失败:', error);
   }
 });
 
