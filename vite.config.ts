@@ -49,10 +49,29 @@ export default defineConfig({
     {
       name: 'copy-manifest',
       generateBundle() {
+        const manifest = require('./src/manifest.json')
+        // 修正路径为构建后的正确路径
+        const fixedManifest = {
+          ...manifest,
+          action: {
+            ...manifest.action,
+            default_popup: 'src/popup/popup.html'
+          },
+          options_ui: {
+            ...manifest.options_ui,
+            page: 'src/options/options.html'
+          },
+          web_accessible_resources: [
+            {
+              resources: ['src/popup/popup.html'],
+              matches: ['*://*.xiaohongshu.com/*']
+            }
+          ]
+        }
         this.emitFile({
           type: 'asset',
           fileName: 'manifest.json',
-          source: JSON.stringify(require('./src/manifest.json'), null, 2),
+          source: JSON.stringify(fixedManifest, null, 2),
         })
       },
     },
