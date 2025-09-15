@@ -1,5 +1,4 @@
-// 改为使用全局变量访问扩展API
-const chrome = window.chrome;
+// 直接使用Chrome提供的全局chrome对象
 
 // 使用命名空间避免全局污染
 (function() {
