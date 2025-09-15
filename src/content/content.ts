@@ -1,9 +1,11 @@
 // 添加防止重复加载的保护
+'use strict';
+
 if (window.__xhsContentScriptLoaded) {
   console.warn('内容脚本已加载，跳过重复注入')
   throw new Error('内容脚本重复注入')
 }
-window.__xhsContentScriptLoaded = true
+window.__xhsContentScriptLoaded = true;
 
 // 直接使用Chrome提供的全局chrome对象
 
@@ -97,7 +99,7 @@ window.__xhsContentScriptLoaded = true
 
       // 页面元素检测 - 更新为小红书当前页面结构
       const hasNoteContent = !!document.querySelector(
-        '[class*="note-detail"], [class*="note-container"], [class*="detail-container"]'
+        '[class*="note"]'
       )
       const hasNoteImages = !!document.querySelector(
         '[class*="swiper-wrapper"], [class*="image-container"], [class*="media-container"]'
@@ -220,6 +222,9 @@ window.__xhsContentScriptLoaded = true
       }
 
       try {
+        // 增加延迟等待动态加载
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
         const selectors = this.selectorManager.getSelectors()
         const [
           title,
@@ -243,7 +248,7 @@ window.__xhsContentScriptLoaded = true
           this.extractNumber(selectors.comments),
         ])
 
-        return {
+        const noteData = {
           title: title || '',
           author: author || '',
           content: content || '',
@@ -255,6 +260,9 @@ window.__xhsContentScriptLoaded = true
           comments: comments || 0,
           sourceUrl: window.location.href,
         }
+        
+        console.log('[Content] 数据采集成功:', noteData)
+        return noteData
       } catch (error) {
         console.error('采集笔记数据失败:', error)
         return null
@@ -361,32 +369,33 @@ window.__xhsContentScriptLoaded = true
 
   // 消息处理函数
   function handleMessage(message, _sender, sendResponse) {
-    // 处理来自 background 的 action 格式消息
-    if (message.action === 'TOGGLE_SIDE_PANEL') {
-      toggleSidePanel()
-      sendResponse({ success: true })
-      return true
-    }
-    
-    switch (message.type) {
-      case 'ping':
-        sendResponse({ pong: true })
-        break
-      case 'TOGGLE_SIDE_PANEL':
+    try {
+      // 处理来自 background 的 action 格式消息
+      if (message.action === 'TOGGLE_SIDE_PANEL') {
         toggleSidePanel()
         sendResponse({ success: true })
-        break
-      case 'GET_PAGE_STATUS':
-        sendResponse({ status: pageDetector.getPageStatus() })
-        break
-      case 'COLLECT_NOTE_DATA':
-        // 当收到采集消息时
-        if (!pageDetector.isNotePage()) {
-          // 发送错误状态到popup
-          chrome.runtime.sendMessage({
-            type: 'pageError',
-            message: '当前页面不是小红书笔记',
-          })
+        return true
+      }
+      
+      switch (message.type) {
+        case 'ping':
+          sendResponse({ pong: true })
+          break
+        case 'TOGGLE_SIDE_PANEL':
+          toggleSidePanel()
+          sendResponse({ success: true })
+          break
+        case 'GET_PAGE_STATUS':
+          sendResponse({ status: pageDetector.getPageStatus() })
+          break
+        case 'COLLECT_NOTE_DATA':
+          // 当收到采集消息时
+          if (!pageDetector.isNotePage()) {
+            // 发送错误状态到popup
+            chrome.runtime.sendMessage({
+              type: 'pageError',
+              message: '当前页面不是小红书笔记'
+            })
           sendResponse({ success: false, error: '当前页面不是小红书笔记' })
           return true // 保持消息通道开放
         }
@@ -395,6 +404,20 @@ window.__xhsContentScriptLoaded = true
           .collectNoteData()
           .then(data => {
             console.log('[Content] 数据采集成功:', data)
+            
+            // 添加防御性检查
+            if (!data || typeof data !== 'object') {
+              console.error('[Content] 无效采集数据:', data)
+              sendResponse({ success: false, error: '采集数据格式无效' })
+              return
+            }
+            
+            // 发送真实数据到后台脚本
+            chrome.runtime.sendMessage({ 
+              type: 'UPLOAD_NOTE', 
+              data: data 
+            })
+            
             sendResponse({ success: true, data })
           })
           .catch(error => {
@@ -427,6 +450,13 @@ window.__xhsContentScriptLoaded = true
         manager.resetToDefault()
         sendResponse({ success: true })
         break
+      default:
+        console.warn('[Content] 未知的消息类型:', message.type)
+        sendResponse({ success: false, error: '未知的消息类型' })
+    }
+    } catch (error) {
+      console.error('[Content] 消息处理错误:', error)
+      sendResponse({ success: false, error: error.message })
     }
   }
 
@@ -437,20 +467,24 @@ window.__xhsContentScriptLoaded = true
 
   // 侧边栏管理功能
   function toggleSidePanel() {
-    const existingPanel = document.getElementById(SIDEPANEL_ID);
-    if (existingPanel) {
-      // 如果侧边栏已存在，则移除它
-      existingPanel.remove();
-    } else {
-      // 如果不存在，则创建并注入
-      const iframe = document.createElement('iframe');
-      iframe.id = SIDEPANEL_ID;
-      iframe.src = chrome.runtime.getURL('popup.html');
-      
-      // 应用样式
-      iframe.style.cssText = SIDEPANEL_STYLE;
-      
-      document.body.appendChild(iframe);
+    try {
+      const existingPanel = document.getElementById(SIDEPANEL_ID);
+      if (existingPanel) {
+        // 如果侧边栏已存在，则移除它
+        existingPanel.remove();
+      } else {
+        // 如果不存在，则创建并注入
+        const iframe = document.createElement('iframe');
+        iframe.id = SIDEPANEL_ID;
+        iframe.src = chrome.runtime.getURL('popup.html');
+        
+        // 应用样式
+        iframe.style.cssText = SIDEPANEL_STYLE;
+        
+        document.body.appendChild(iframe);
+      }
+    } catch (error) {
+      console.error('[Content] 切换侧边栏失败:', error);
     }
   }
 

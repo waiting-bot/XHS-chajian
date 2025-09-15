@@ -15,7 +15,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.xiaohongshu.com/*"],
+      "matches": [
+        "https://www.xiaohongshu.com/user/profile/*?note=*",
+        "https://www.xiaohongshu.com/explore/*",
+        "https://www.xiaohongshu.com/*note/*"
+      ],
       "js": ["content/content.js"],
       "css": ["content/content.css"],
       "all_frames": false,

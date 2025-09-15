@@ -70,8 +70,23 @@ class FeishuAPIClient {
 
       const data = await response.json();
       
+      // 打印完整返回值用于调试
+      console.log('Feishu token response', data);
+      
+      // 增加防御性代码 - 检查返回值结构
+      if (!data || typeof data === 'undefined') {
+        console.error('飞书Token API返回异常: 返回值为undefined', data);
+        throw new Error('飞书Token API返回值为undefined');
+      }
+      
+      if (typeof data.code === 'undefined') {
+        console.error('飞书Token API返回异常: 缺少code字段', data);
+        throw new Error('飞书Token API返回格式异常');
+      }
+      
       if (data.code !== 0) {
-        throw new Error(`获取访问令牌失败: ${data.msg}`);
+        console.error('飞书Token API返回错误:', data);
+        throw new Error(`获取访问令牌失败: ${data.msg || '未知错误'}`);
       }
 
       this.accessToken = data.data.tenant_access_token;
@@ -103,8 +118,23 @@ class FeishuAPIClient {
 
       const prepareData = await prepareResponse.json();
       
+      // 打印完整返回值用于调试
+      console.log('Feishu prepare upload response', prepareData);
+      
+      // 增加防御性代码 - 检查返回值结构
+      if (!prepareData || typeof prepareData === 'undefined') {
+        console.error('飞书文件上传准备API返回异常: 返回值为undefined', prepareData);
+        throw new Error('飞书文件上传准备API返回值为undefined');
+      }
+      
+      if (typeof prepareData.code === 'undefined') {
+        console.error('飞书文件上传准备API返回异常: 缺少code字段', prepareData);
+        throw new Error('飞书文件上传准备API返回格式异常');
+      }
+      
       if (prepareData.code !== 0) {
-        throw new Error(`准备上传失败: ${prepareData.msg}`);
+        console.error('飞书文件上传准备API返回错误:', prepareData);
+        throw new Error(`准备上传失败: ${prepareData.msg || '未知错误'}`);
       }
 
       const uploadData = prepareData.data;
@@ -159,8 +189,23 @@ class FeishuAPIClient {
 
         const data = await response.json();
         
+        // 打印完整返回值用于调试
+        console.log('Feishu response', data);
+        
+        // 增加防御性代码 - 检查返回值结构
+        if (!data || typeof data === 'undefined') {
+          console.error('飞书API返回异常: 返回值为undefined', data);
+          throw new Error('飞书API返回值为undefined');
+        }
+        
+        if (typeof data.code === 'undefined') {
+          console.error('飞书API返回异常: 缺少code字段', data);
+          throw new Error('飞书API返回格式异常');
+        }
+        
         if (data.code !== 0) {
-          throw new Error(`写入表格失败: ${data.msg}`);
+          console.error('飞书API返回错误:', data);
+          throw new Error(`写入表格失败: ${data.msg || '未知错误'}`);
         }
 
         results.push({
@@ -271,18 +316,26 @@ async function urlToFile(url: string, filename: string): Promise<File> {
 // 主要的消息处理
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   try {
+    if (message.type === 'UPLOAD_NOTE' && message.data) {
+      try {
+        const result = await uploadToFeishu(message.data);
+        sendResponse({ success: true, recordId: result[0]?.recordIds?.[0] });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+      return true;
+    }
+    
     switch (message.type) {
       case 'PROCESS_NOTE_DATA':
         console.log('开始处理笔记数据:', message.data);
         processNoteData(message.data, sendResponse);
         return true; // 保持消息通道开放用于异步响应
-        break;
         
       case 'TEST_CONFIG':
         console.log('测试配置:', message.config);
         testConfig(message.config, sendResponse);
         return true; // 保持消息通道开放用于异步响应
-        break;
         
       case 'PING':
         sendResponse({ pong: true });
@@ -482,6 +535,70 @@ async function testConfig(config: any, sendResponse: (response: any) => void) {
     });
   }
 }
+
+// 飞书数据上传函数
+async function uploadToFeishu(noteData: any): Promise<any> {
+  try {
+    console.log('[Background] 接收到采集数据:', noteData);
+    
+    // 获取飞书配置
+    const configResult = await chrome.storage.sync.get(['feishuSpreadsheetUrl', 'feishuTableUrl', 'feishuAppToken', 'feishuTableId']);
+    const tableUrl = configResult.feishuSpreadsheetUrl || configResult.feishuTableUrl;
+    const appToken = configResult.feishuAppToken;
+    const tableId = configResult.feishuTableId;
+    
+    if (!tableUrl) {
+      throw new Error('未配置飞书表格URL');
+    }
+
+    // 如果有appToken和tableId直接使用，否则解析URL
+    let finalAppToken = appToken;
+    let finalTableId = tableId;
+    
+    if (!finalAppToken || !finalTableId) {
+      const parsed = FeishuAPIClient.parseTableUrl(tableUrl);
+      finalAppToken = parsed.appToken;
+      finalTableId = parsed.tableId;
+    }
+
+    // 初始化飞书客户端
+    const client = await initFeishuClient();
+    if (!client) {
+      throw new Error('飞书客户端初始化失败');
+    }
+
+    // 构建记录数据 - 按照bug.md要求的字段映射
+    const record = {
+      fields: {
+        "标题": noteData.title || '',
+        "作者": noteData.author || '',
+        "正文": noteData.content || '',
+        "标签": noteData.tags?.join(', ') || '',
+        "点赞": noteData.likes || 0,
+        "收藏": noteData.collects || 0,
+        "评论": noteData.comments || 0,
+        "url": noteData.sourceUrl || '',
+        "图片附件": noteData.images?.map(img => img.fileToken || img).join(',') || '',
+        "视频附件": noteData.videos?.map(video => video.fileToken || video).join(',') || '',
+        "采集备注": noteData.noteRemark || '',
+        "采集时间": new Date().toISOString()
+      }
+    };
+
+    console.log('[Background] 准备写入飞书数据:', record);
+
+    // 写入飞书表格
+    const result = await client.writeTableRecords(finalAppToken, finalTableId, [record]);
+    
+    console.log('[Background] 飞书写入成功, record_id:', result[0]?.recordIds?.[0]);
+    return result;
+    
+  } catch (error) {
+    console.error('[Background] 写入飞书失败:', error);
+    throw error;
+  }
+}
+
 
 // 安装事件
 chrome.runtime.onInstalled.addListener(() => {
