@@ -11,8 +11,8 @@ export default defineConfig({
         'content/content': './src/content/content.ts',
         'background/background': './src/background/background.ts',
         'popup/popup': './src/popup/popup.ts',
-        'popup/popup.html': './src/popup/popup.html',
         'options/options': './src/options/options.ts',
+        'popup/popup.html': './src/popup/popup.html',
         'options/options.html': './src/options/options.html',
       },
       output: {
@@ -53,6 +53,10 @@ export default defineConfig({
         // 修正路径为构建后的正确路径
         const fixedManifest = {
           ...manifest,
+          background: {
+            service_worker: 'background/background.js',
+            type: 'module'
+          },
           action: {
             ...manifest.action,
             default_popup: 'src/popup/popup.html'

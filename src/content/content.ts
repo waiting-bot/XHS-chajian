@@ -1,3 +1,10 @@
+// 添加防止重复加载的保护
+if (window.__xhsContentScriptLoaded) {
+  console.warn('内容脚本已加载，跳过重复注入')
+  throw new Error('内容脚本重复注入')
+}
+window.__xhsContentScriptLoaded = true
+
 // 直接使用Chrome提供的全局chrome对象
 
 // 使用命名空间避免全局污染
@@ -447,8 +454,23 @@
     }
   }
 
-  // 初始化逻辑
-  chrome.runtime.onMessage.addListener(handleMessage);
+  // 消息处理
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'COLLECT_NOTE') {
+      dataCollector.collectNoteData()
+        .then(data => {
+          console.log('采集到的数据:', data)
+          sendResponse({ success: true, data })
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message })
+        })
+      return true // 保持消息通道开放
+    }
+    
+    // 处理其他消息类型
+    return handleMessage(message, sender, sendResponse)
+  })
 
   // 页面初始化
   console.log('小红书笔记采集器已加载')

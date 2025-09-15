@@ -1,4 +1,5 @@
 import './popup.css'
+import { CollectionState } from '../lib/state-manager'
 
 // 扩展的类型定义
 interface ConfigStatus {
@@ -1509,6 +1510,35 @@ ${configCount === 0 ?
       window.close()
     } catch (error) {
       console.error('关闭窗口失败:', error)
+    }
+  }
+
+  // 更新UI以反映状态管理
+  private updateUI() {
+    const state = CollectionState.currentState;
+    const error = CollectionState.errorMessage;
+    
+    // 根据状态更新UI
+    switch(state) {
+      case 'idle':
+        // 显示初始状态
+        break;
+      case 'collecting':
+        // 显示采集状态
+        this.showNotification('采集中', '正在采集笔记数据...', 'info');
+        break;
+      case 'uploading':
+        // 显示上传状态
+        this.showNotification('上传中', '正在上传到飞书...', 'info');
+        break;
+      case 'success':
+        // 显示成功状态
+        this.showNotification('成功', '数据已成功写入飞书表格', 'success');
+        break;
+      case 'error':
+        // 显示错误状态
+        this.showNotification('错误', error || '处理失败', 'error');
+        break;
     }
   }
 }

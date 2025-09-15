@@ -1,4 +1,30 @@
-// 飞书API集成的background script
+// 添加Service Worker生命周期日志
+console.log('Service Worker 正在启动...')
+
+self.addEventListener('install', (event) => {
+  console.log('Service Worker 安装中...')
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker 激活中...')
+  event.waitUntil(self.clients.claim())
+})
+
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('扩展已安装')
+})
+
+// 保持活跃的心跳机制
+setInterval(() => {
+  console.log('Service Worker 心跳')
+}, 30000)
+
+// 添加全局错误处理
+self.addEventListener('error', (event) => {
+  console.error('SW全局错误:', event.error)
+})
+
 chrome.action.onClicked.addListener(async (tab) => {
   try {
     // 当用户点击插件图标时，向当前激活的标签页的 content script 发送消息
