@@ -132,6 +132,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message))
         } else {
+          // 通知popup页面更新状态
+          chrome.runtime.sendMessage({
+            type: 'configUpdated',
+            data: {
+              feishuAppId: config.feishuAppId,
+              feishuAppSecret: config.feishuAppSecret,
+              feishuAppToken: config.feishuAppToken,
+              feishuTableId: config.feishuTableId
+            }
+          }, (response) => {
+            console.log('发送配置更新消息结果:', response);
+          });
+          
           resolve(true)
         }
       })

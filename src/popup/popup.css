@@ -117,6 +117,16 @@ button.secondary:hover {
   }
 }
 
+.debug-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #f1f8ff;
+  border: 1px solid #c8e1ff;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
 /* 苹果设计风格的现代CSS */
 :root {
   /* 颜色系统 - 苹果风格 */
