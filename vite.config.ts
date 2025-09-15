@@ -12,19 +12,19 @@ export default defineConfig({
         'popup/popup': './src/popup/popup.ts',
         'popup/popup.html': './src/popup/popup.html',
         'options/options': './src/options/options.ts',
-        'options/options.html': './src/options/options.html'
+        'options/options.html': './src/options/options.html',
       },
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: (assetInfo) => {
+        assetFileNames: assetInfo => {
           if (assetInfo.name.endsWith('.css')) {
             return 'content/[name][extname]'
           }
           return 'assets/[name].[ext]'
-        }
-      }
-    }
+        },
+      },
+    },
   },
   publicDir: 'src/assets',
   plugins: [
@@ -34,9 +34,12 @@ export default defineConfig({
         this.emitFile({
           type: 'asset',
           fileName: 'content/content.css',
-          source: require('fs').readFileSync('./src/content/content.css', 'utf8')
+          source: require('fs').readFileSync(
+            './src/content/content.css',
+            'utf8'
+          ),
         })
-      }
+      },
     },
     {
       name: 'copy-manifest',
@@ -44,9 +47,9 @@ export default defineConfig({
         this.emitFile({
           type: 'asset',
           fileName: 'manifest.json',
-          source: JSON.stringify(require('./src/manifest.json'), null, 2)
+          source: JSON.stringify(require('./src/manifest.json'), null, 2),
         })
-      }
-    }
-  ]
+      },
+    },
+  ],
 })

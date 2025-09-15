@@ -26,7 +26,7 @@
   "tableDataConfig": {
     "fieldMapping": {
       "title": "标题",
-      "author": "作者", 
+      "author": "作者",
       "content": "正文",
       "tags": "标签",
       "images": "图片",
@@ -82,13 +82,13 @@
 
 在应用管理页面添加以下权限：
 
-| 权限名称 | 权限码 | 用途 |
-|---------|--------|------|
-| 多维表格-表格 | `bitable:table` | 读取和写入表格数据 |
-| 多维表格-字段 | `bitable:field` | 获取表格字段信息 |
-| 多维表格-记录 | `bitable:record` | 创建和读取记录 |
-| 云文档-文件 | `drive:file` | 上传图片和视频文件 |
-| 用户信息-用户 | `user:profile` | 获取用户信息 |
+| 权限名称      | 权限码           | 用途               |
+| ------------- | ---------------- | ------------------ |
+| 多维表格-表格 | `bitable:table`  | 读取和写入表格数据 |
+| 多维表格-字段 | `bitable:field`  | 获取表格字段信息   |
+| 多维表格-记录 | `bitable:record` | 创建和读取记录     |
+| 云文档-文件   | `drive:file`     | 上传图片和视频文件 |
+| 用户信息-用户 | `user:profile`   | 获取用户信息       |
 
 ### 3. 获取应用凭证
 
@@ -103,23 +103,24 @@
 1. 在飞书中创建新的多维表格
 2. 设计表格结构（推荐字段）：
 
-| 字段名 | 字段类型 | 说明 |
-|--------|----------|------|
-| 标题 | 文本 | 笔记标题 |
-| 作者 | 文本 | 笔记作者 |
-| 正文 | 多行文本 | 笔记正文内容 |
-| 标签 | 多选 | 笔记标签 |
-| 图片 | 附件 | 笔记图片 |
-| 视频 | 附件 | 笔记视频 |
-| 点赞数 | 数字 | 点赞数量 |
-| 收藏数 | 数字 | 收藏数量 |
-| 评论数 | 数字 | 评论数量 |
-| 链接 | 超链接 | 原始链接 |
-| 创建时间 | 日期 | 笔记创建时间 |
+| 字段名   | 字段类型 | 说明         |
+| -------- | -------- | ------------ |
+| 标题     | 文本     | 笔记标题     |
+| 作者     | 文本     | 笔记作者     |
+| 正文     | 多行文本 | 笔记正文内容 |
+| 标签     | 多选     | 笔记标签     |
+| 图片     | 附件     | 笔记图片     |
+| 视频     | 附件     | 笔记视频     |
+| 点赞数   | 数字     | 点赞数量     |
+| 收藏数   | 数字     | 收藏数量     |
+| 评论数   | 数字     | 评论数量     |
+| 链接     | 超链接   | 原始链接     |
+| 创建时间 | 日期     | 笔记创建时间 |
 
 ### 5. 获取表格ID
 
 在多维表格的URL中找到表格ID：
+
 ```
 https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
                                     ^^^^^^^^^^^^^^
@@ -150,7 +151,7 @@ https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
   "tableDataConfig": {
     "fieldMapping": {
       "title": "标题",
-      "author": "作者", 
+      "author": "作者",
       "content": "正文",
       "tags": "标签",
       "images": "图片",
@@ -225,7 +226,7 @@ https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
   "tableDataConfig": {
     "fieldMapping": {
       "title": "标题",
-      "author": "作者", 
+      "author": "作者",
       "content": "正文",
       "tags": "标签",
       "images": "图片",
@@ -274,7 +275,7 @@ https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
 {
   "fieldMapping": {
     "title": "标题",
-    "author": "作者", 
+    "author": "作者",
     "content": "正文",
     "tags": "标签",
     "images": "图片",
@@ -296,7 +297,7 @@ https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
 {
   "fieldMapping": {
     "title": "笔记标题",
-    "author": "发布者", 
+    "author": "发布者",
     "content": "笔记内容",
     "tags": "关键词",
     "images": "配图",
@@ -360,6 +361,7 @@ https://example.feishu.cn/baserect/v1/bascnxxxxxxxxxx
 ### 配置备份
 
 建议定期备份配置：
+
 1. 手动导出配置文件
 2. 保存到安全位置
 3. 记录配置版本信息

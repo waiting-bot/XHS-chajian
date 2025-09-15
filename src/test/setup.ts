@@ -9,12 +9,12 @@ const createChromeMock = () => {
       set: vi.fn(),
       remove: vi.fn(),
       clear: vi.fn(),
-      getBytesInUse: vi.fn()
+      getBytesInUse: vi.fn(),
     },
     onChanged: {
       addListener: vi.fn(),
-      removeListener: vi.fn()
-    }
+      removeListener: vi.fn(),
+    },
   }
 
   const mockRuntime = {
@@ -22,7 +22,7 @@ const createChromeMock = () => {
     getURL: vi.fn(),
     getManifest: vi.fn(),
     connect: vi.fn(),
-    sendMessage: vi.fn()
+    sendMessage: vi.fn(),
   }
 
   return {
@@ -32,18 +32,18 @@ const createChromeMock = () => {
       query: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      remove: vi.fn()
+      remove: vi.fn(),
     },
     scripting: {
       executeScript: vi.fn(),
-      insertCSS: vi.fn()
+      insertCSS: vi.fn(),
     },
     action: {
       onClicked: {
         addListener: vi.fn(),
-        removeListener: vi.fn()
-      }
-    }
+        removeListener: vi.fn(),
+      },
+    },
   }
 }
 
@@ -55,7 +55,7 @@ global.jest = {
   fn: vi.fn,
   clearAllMocks: vi.clearAllMocks,
   mock: vi.mock,
-  spyOn: vi.spyOn
+  spyOn: vi.spyOn,
 }
 
 // 模拟 console 方法以避免测试中的过多输出

@@ -26,8 +26,8 @@ export interface FeishuUploadResult {
 }
 
 export class FeishuClient {
-  private config: FeishuConfig;
-  private tokenExpiry: number = 0;
+  private config: FeishuConfig
+  private tokenExpiry: number = 0
 
   constructor(config: Partial<FeishuConfig>) {
     this.config = {
@@ -35,330 +35,360 @@ export class FeishuClient {
       appSecret: config.appSecret || '',
       accessToken: config.accessToken || '',
       tableId: config.tableId || '',
-      baseUrl: config.baseUrl || 'https://open.feishu.cn'
-    };
+      baseUrl: config.baseUrl || 'https://open.feishu.cn',
+    }
   }
 
   public async updateConfig(config: Partial<FeishuConfig>): Promise<void> {
-    this.config = { ...this.config, ...config };
+    this.config = { ...this.config, ...config }
     // 不再直接保存配置，由配置管理器统一管理
   }
 
   public async saveConfig(): Promise<void> {
     // 不再直接保存配置，由配置管理器统一管理
-    console.warn('FeishuClient.saveConfig() 已弃用，请使用 ConfigManager');
+    console.warn('FeishuClient.saveConfig() 已弃用，请使用 ConfigManager')
   }
 
   public async loadConfig(): Promise<void> {
     // 不再直接加载配置，由配置管理器统一管理
-    console.warn('FeishuClient.loadConfig() 已弃用，请使用 ConfigManager');
+    console.warn('FeishuClient.loadConfig() 已弃用，请使用 ConfigManager')
   }
 
   public async getAccessToken(): Promise<string> {
     // 如果有access token且未过期，直接使用
     if (this.config.accessToken && Date.now() < this.tokenExpiry) {
-      return this.config.accessToken;
+      return this.config.accessToken
     }
 
     // 如果没有appId和appSecret，使用用户提供的access token
     if (!this.config.appId || !this.config.appSecret) {
       if (!this.config.accessToken) {
-        throw new Error('请提供飞书Access Token');
+        throw new Error('请提供飞书Access Token')
       }
-      return this.config.accessToken;
+      return this.config.accessToken
     }
 
     // 使用app credentials获取access token
-    return await this.refreshAccessToken();
+    return await this.refreshAccessToken()
   }
 
   private async refreshAccessToken(): Promise<string> {
-    const url = `${this.config.baseUrl}/open-apis/auth/v3/tenant_access_token/internal`;
-    
+    const url = `${this.config.baseUrl}/open-apis/auth/v3/tenant_access_token/internal`
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         app_id: this.config.appId,
-        app_secret: this.config.appSecret
-      })
-    });
+        app_secret: this.config.appSecret,
+      }),
+    })
 
     if (!response.ok) {
-      throw new Error(`获取Access Token失败: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `获取Access Token失败: ${response.status} ${response.statusText}`
+      )
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
 
-    this.config.accessToken = data.tenant_access_token;
-    this.tokenExpiry = Date.now() + (data.expire - 300) * 1000; // 提前5分钟过期
-    
+    this.config.accessToken = data.tenant_access_token
+    this.tokenExpiry = Date.now() + (data.expire - 300) * 1000 // 提前5分钟过期
+
     // 不再直接保存配置，由配置管理器统一管理
-    
-    return this.config.accessToken;
+
+    return this.config.accessToken
   }
 
   public async testConnection(): Promise<boolean> {
     try {
-      const token = await this.getAccessToken();
-      const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables`;
-      
+      const token = await this.getAccessToken()
+      const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables`
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
 
-      return response.ok;
+      return response.ok
     } catch (error) {
-      console.error('测试连接失败:', error);
-      return false;
+      console.error('测试连接失败:', error)
+      return false
     }
   }
 
   public async getTableFields(tableId?: string): Promise<FeishuField[]> {
-    const token = await this.getAccessToken();
-    const table = tableId || this.config.tableId;
-    
+    const token = await this.getAccessToken()
+    const table = tableId || this.config.tableId
+
     if (!table) {
-      throw new Error('请提供表格ID');
+      throw new Error('请提供表格ID')
     }
 
-    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/fields`;
-    
+    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/fields`
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
     if (!response.ok) {
-      throw new Error(`获取表格字段失败: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `获取表格字段失败: ${response.status} ${response.statusText}`
+      )
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
 
-    return data.data.items || [];
+    return data.data.items || []
   }
 
-  public async uploadFile(file: Blob, filename: string, onProgress?: (progress: number) => void): Promise<FeishuUploadResult> {
-    const token = await this.getAccessToken();
-    
+  public async uploadFile(
+    file: Blob,
+    filename: string,
+    onProgress?: (progress: number) => void
+  ): Promise<FeishuUploadResult> {
+    const token = await this.getAccessToken()
+
     // 首先获取上传地址
-    const prepareUrl = `${this.config.baseUrl}/open-apis/drive/v1/medias/upload_all`;
-    
+    const prepareUrl = `${this.config.baseUrl}/open-apis/drive/v1/medias/upload_all`
+
     const prepareResponse = await fetch(prepareUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         file_name: filename,
         file_type: file.type,
         file_size: file.size,
         parent_type: 'bitable_image',
-        parent_node: this.config.tableId
-      })
-    });
+        parent_node: this.config.tableId,
+      }),
+    })
 
     if (!prepareResponse.ok) {
-      throw new Error(`准备上传失败: ${prepareResponse.status} ${prepareResponse.statusText}`);
+      throw new Error(
+        `准备上传失败: ${prepareResponse.status} ${prepareResponse.statusText}`
+      )
     }
 
-    const prepareData = await prepareResponse.json();
-    
+    const prepareData = await prepareResponse.json()
+
     if (prepareData.code !== 0) {
-      throw new Error(`飞书API错误: ${prepareData.msg}`);
+      throw new Error(`飞书API错误: ${prepareData.msg}`)
     }
 
-    const { upload_url, file_token } = prepareData.data;
+    const { upload_url, file_token } = prepareData.data
 
     // 上传文件
     const uploadResponse = await fetch(upload_url, {
       method: 'PUT',
       headers: {
         'Content-Type': file.type,
-        'Content-Length': file.size.toString()
+        'Content-Length': file.size.toString(),
       },
-      body: file
-    });
+      body: file,
+    })
 
     if (!uploadResponse.ok) {
-      throw new Error(`上传文件失败: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      throw new Error(
+        `上传文件失败: ${uploadResponse.status} ${uploadResponse.statusText}`
+      )
     }
 
     return {
       fileToken: file_token,
       name: filename,
       size: file.size,
-      type: file.type
-    };
+      type: file.type,
+    }
   }
 
-  public async createRecord(record: FeishuRecord, tableId?: string): Promise<{ record_id: string }> {
-    const token = await this.getAccessToken();
-    const table = tableId || this.config.tableId;
-    
+  public async createRecord(
+    record: FeishuRecord,
+    tableId?: string
+  ): Promise<{ record_id: string }> {
+    const token = await this.getAccessToken()
+    const table = tableId || this.config.tableId
+
     if (!table) {
-      throw new Error('请提供表格ID');
+      throw new Error('请提供表格ID')
     }
 
-    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records`;
-    
+    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records`
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        fields: record.fields
-      })
-    });
+        fields: record.fields,
+      }),
+    })
 
     if (!response.ok) {
-      throw new Error(`创建记录失败: ${response.status} ${response.statusText}`);
+      throw new Error(`创建记录失败: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
 
     return {
-      record_id: data.data.record.record_id
-    };
+      record_id: data.data.record.record_id,
+    }
   }
 
-  public async batchCreateRecords(records: FeishuRecord[], tableId?: string): Promise<{ record_id: string }[]> {
-    const token = await this.getAccessToken();
-    const table = tableId || this.config.tableId;
-    
+  public async batchCreateRecords(
+    records: FeishuRecord[],
+    tableId?: string
+  ): Promise<{ record_id: string }[]> {
+    const token = await this.getAccessToken()
+    const table = tableId || this.config.tableId
+
     if (!table) {
-      throw new Error('请提供表格ID');
+      throw new Error('请提供表格ID')
     }
 
-    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/batch_create`;
-    
+    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/batch_create`
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         records: records.map(record => ({
-          fields: record.fields
-        }))
-      })
-    });
+          fields: record.fields,
+        })),
+      }),
+    })
 
     if (!response.ok) {
-      throw new Error(`批量创建记录失败: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `批量创建记录失败: ${response.status} ${response.statusText}`
+      )
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
 
     return data.data.records.map((record: any) => ({
-      record_id: record.record_id
-    }));
+      record_id: record.record_id,
+    }))
   }
 
-  public async updateRecord(recordId: string, record: FeishuRecord, tableId?: string): Promise<void> {
-    const token = await this.getAccessToken();
-    const table = tableId || this.config.tableId;
-    
+  public async updateRecord(
+    recordId: string,
+    record: FeishuRecord,
+    tableId?: string
+  ): Promise<void> {
+    const token = await this.getAccessToken()
+    const table = tableId || this.config.tableId
+
     if (!table) {
-      throw new Error('请提供表格ID');
+      throw new Error('请提供表格ID')
     }
 
-    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/${recordId}`;
-    
+    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/${recordId}`
+
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        fields: record.fields
-      })
-    });
+        fields: record.fields,
+      }),
+    })
 
     if (!response.ok) {
-      throw new Error(`更新记录失败: ${response.status} ${response.statusText}`);
+      throw new Error(`更新记录失败: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
   }
 
-  public async searchRecords(filter: Record<string, any>, tableId?: string): Promise<FeishuRecord[]> {
-    const token = await this.getAccessToken();
-    const table = tableId || this.config.tableId;
-    
+  public async searchRecords(
+    filter: Record<string, any>,
+    tableId?: string
+  ): Promise<FeishuRecord[]> {
+    const token = await this.getAccessToken()
+    const table = tableId || this.config.tableId
+
     if (!table) {
-      throw new Error('请提供表格ID');
+      throw new Error('请提供表格ID')
     }
 
-    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/search`;
-    
+    const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records/search`
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filter: filter
-      })
-    });
+        filter: filter,
+      }),
+    })
 
     if (!response.ok) {
-      throw new Error(`搜索记录失败: ${response.status} ${response.statusText}`);
+      throw new Error(`搜索记录失败: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json();
-    
+    const data = await response.json()
+
     if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`);
+      throw new Error(`飞书API错误: ${data.msg}`)
     }
 
-    return data.data.items || [];
+    return data.data.items || []
   }
 
   public getConfig(): FeishuConfig {
-    return { ...this.config };
+    return { ...this.config }
   }
 
   public isConfigured(): boolean {
-    return !!(this.config.accessToken || (this.config.appId && this.config.appSecret));
+    return !!(
+      this.config.accessToken ||
+      (this.config.appId && this.config.appSecret)
+    )
   }
 }
 
-export const feishuClient = new FeishuClient({});
+export const feishuClient = new FeishuClient({})
 
-export default FeishuClient;
+export default FeishuClient

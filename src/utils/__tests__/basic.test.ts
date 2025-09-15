@@ -14,8 +14,8 @@ describe('EncryptionManager Basic Tests', () => {
       }),
       healthCheck: vi.fn().mockImplementation(async () => ({
         healthy: encryptionManager.isInitialized,
-        issues: encryptionManager.isInitialized ? [] : ['加密管理器未初始化']
-      }))
+        issues: encryptionManager.isInitialized ? [] : ['加密管理器未初始化'],
+      })),
     }
     vi.clearAllMocks()
   })
@@ -30,14 +30,14 @@ describe('EncryptionManager Basic Tests', () => {
     it('should pass health check when initialized', async () => {
       await encryptionManager.initialize()
       const health = await encryptionManager.healthCheck()
-      
+
       expect(health.healthy).toBe(true)
       expect(health.issues).toHaveLength(0)
     })
 
     it('should fail health check when not initialized', async () => {
       const health = await encryptionManager.healthCheck()
-      
+
       expect(health.healthy).toBe(false)
       expect(health.issues).toContain('加密管理器未初始化')
     })
@@ -55,16 +55,16 @@ describe('StorageManager Basic Tests', () => {
           get: vi.fn(),
           set: vi.fn(),
           remove: vi.fn(),
-          clear: vi.fn()
+          clear: vi.fn(),
         },
         onChanged: {
           addListener: vi.fn(),
-          removeListener: vi.fn()
-        }
+          removeListener: vi.fn(),
+        },
       },
       runtime: {
-        id: 'test-extension-id'
-      }
+        id: 'test-extension-id',
+      },
     }
 
     storageManager = {
@@ -73,21 +73,23 @@ describe('StorageManager Basic Tests', () => {
       initialize: vi.fn().mockImplementation(async () => {
         storageManager.isInitialized = true
       }),
-      get: vi.fn().mockImplementation(async (key: string, defaultValue?: any) => {
-        // 模拟存储获取
-        if (key === 'testKey') {
-          return 'test-value'
-        }
-        return defaultValue
-      }),
+      get: vi
+        .fn()
+        .mockImplementation(async (key: string, defaultValue?: any) => {
+          // 模拟存储获取
+          if (key === 'testKey') {
+            return 'test-value'
+          }
+          return defaultValue
+        }),
       set: vi.fn().mockImplementation(async (key: string, value: any) => {
         // 模拟存储设置
         storageManager.cache.set(key, value)
       }),
       healthCheck: vi.fn().mockImplementation(async () => ({
         healthy: storageManager.isInitialized,
-        issues: storageManager.isInitialized ? [] : ['存储管理器未初始化']
-      }))
+        issues: storageManager.isInitialized ? [] : ['存储管理器未初始化'],
+      })),
     }
     vi.clearAllMocks()
   })
@@ -100,32 +102,32 @@ describe('StorageManager Basic Tests', () => {
 
     it('should get and set values', async () => {
       await storageManager.initialize()
-      
+
       await storageManager.set('testKey', 'test-value')
       const result = await storageManager.get('testKey', 'default')
-      
+
       expect(result).toBe('test-value')
     })
 
     it('should return default value for missing keys', async () => {
       await storageManager.initialize()
-      
+
       const result = await storageManager.get('missingKey', 'default')
-      
+
       expect(result).toBe('default')
     })
 
     it('should pass health check when initialized', async () => {
       await storageManager.initialize()
       const health = await storageManager.healthCheck()
-      
+
       expect(health.healthy).toBe(true)
       expect(health.issues).toHaveLength(0)
     })
 
     it('should fail health check when not initialized', async () => {
       const health = await storageManager.healthCheck()
-      
+
       expect(health.healthy).toBe(false)
       expect(health.issues).toContain('存储管理器未初始化')
     })
@@ -135,7 +137,7 @@ describe('StorageManager Basic Tests', () => {
     it('should handle missing Chrome API gracefully', () => {
       const originalChrome = global.chrome
       delete (global as any).chrome
-      
+
       expect(() => {
         // 测试代码应该能处理 Chrome API 不存在的情况
         const testManager = {
@@ -143,11 +145,11 @@ describe('StorageManager Basic Tests', () => {
             if (!global.chrome) {
               throw new Error('Chrome API 不可用')
             }
-          })
+          }),
         }
         return testManager
       }).not.toThrow()
-      
+
       // 恢复 chrome API
       global.chrome = originalChrome
     })

@@ -1,16 +1,16 @@
 // 错误通知组件
 
-import { AppError, ErrorLevel, ErrorType } from '../types/error';
-import { errorManager } from './errorManager';
+import { AppError, ErrorLevel, ErrorType } from '../types/error'
+import { errorManager } from './errorManager'
 
 // 通知配置
 export interface NotificationConfig {
-  duration: number;
-  maxNotifications: number;
-  position: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
-  enableSound: boolean;
-  enableDesktop: boolean;
-  showDetails: boolean;
+  duration: number
+  maxNotifications: number
+  position: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+  enableSound: boolean
+  enableDesktop: boolean
+  showDetails: boolean
 }
 
 // 通知类型
@@ -18,51 +18,51 @@ export enum NotificationType {
   SUCCESS = 'success',
   WARNING = 'warning',
   ERROR = 'error',
-  INFO = 'info'
+  INFO = 'info',
 }
 
 // 通知数据接口
 export interface NotificationData {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  timestamp: number;
-  details?: any;
-  actions?: NotificationAction[];
-  autoClose: boolean;
-  progress?: number;
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  timestamp: number
+  details?: any
+  actions?: NotificationAction[]
+  autoClose: boolean
+  progress?: number
 }
 
 // 通知动作接口
 export interface NotificationAction {
-  label: string;
-  onClick: () => void;
-  icon?: string;
-  primary?: boolean;
+  label: string
+  onClick: () => void
+  icon?: string
+  primary?: boolean
 }
 
 // 错误通知管理器
 export class ErrorNotificationManager {
-  private static instance: ErrorNotificationManager;
-  private notifications: Map<string, NotificationData> = new Map();
-  private config: NotificationConfig;
-  private container: HTMLElement | null = null;
-  private soundEnabled = false;
-  private desktopEnabled = false;
+  private static instance: ErrorNotificationManager
+  private notifications: Map<string, NotificationData> = new Map()
+  private config: NotificationConfig
+  private container: HTMLElement | null = null
+  private soundEnabled = false
+  private desktopEnabled = false
 
   private constructor() {
-    this.config = this.getDefaultConfig();
-    this.initializeContainer();
-    this.initializeErrorListener();
-    this.checkBrowserSupport();
+    this.config = this.getDefaultConfig()
+    this.initializeContainer()
+    this.initializeErrorListener()
+    this.checkBrowserSupport()
   }
 
   static getInstance(): ErrorNotificationManager {
     if (!ErrorNotificationManager.instance) {
-      ErrorNotificationManager.instance = new ErrorNotificationManager();
+      ErrorNotificationManager.instance = new ErrorNotificationManager()
     }
-    return ErrorNotificationManager.instance;
+    return ErrorNotificationManager.instance
   }
 
   // 获取默认配置
@@ -74,56 +74,61 @@ export class ErrorNotificationManager {
       enableSound: false,
       enableDesktop: false,
       showDetails: false,
-    };
+    }
   }
 
   // 初始化容器
   private initializeContainer(): void {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') return
 
     // 查找或创建容器
-    this.container = document.getElementById('error-notification-container');
+    this.container = document.getElementById('error-notification-container')
     if (!this.container) {
-      this.container = document.createElement('div');
-      this.container.id = 'error-notification-container';
-      this.container.className = 'error-notification-container';
-      document.body.appendChild(this.container);
+      this.container = document.createElement('div')
+      this.container.id = 'error-notification-container'
+      this.container.className = 'error-notification-container'
+      document.body.appendChild(this.container)
     }
 
     // 应用位置样式
-    this.updateContainerPosition();
+    this.updateContainerPosition()
   }
 
   // 更新容器位置
   private updateContainerPosition(): void {
-    if (!this.container) return;
+    if (!this.container) return
 
     // 移除所有位置类
-    this.container.classList.remove('top-right', 'top-left', 'bottom-right', 'bottom-left');
-    
+    this.container.classList.remove(
+      'top-right',
+      'top-left',
+      'bottom-right',
+      'bottom-left'
+    )
+
     // 添加当前位置类
-    this.container.classList.add(this.config.position);
+    this.container.classList.add(this.config.position)
   }
 
   // 检查浏览器支持
   private checkBrowserSupport(): void {
     if (typeof Notification !== 'undefined') {
-      this.desktopEnabled = Notification.permission === 'granted';
+      this.desktopEnabled = Notification.permission === 'granted'
     }
 
     // 检查音频支持
-    this.soundEnabled = typeof Audio !== 'undefined';
+    this.soundEnabled = typeof Audio !== 'undefined'
   }
 
   // 初始化错误监听器
   private initializeErrorListener(): void {
-    errorManager.addEventListener(this.handleAppError.bind(this));
+    errorManager.addEventListener(this.handleAppError.bind(this))
   }
 
   // 处理应用错误
   private handleAppError(error: AppError): void {
-    const notificationType = this.getErrorNotificationType(error.level);
-    
+    const notificationType = this.getErrorNotificationType(error.level)
+
     this.showNotification({
       type: notificationType,
       title: this.getErrorTitle(error),
@@ -134,11 +139,11 @@ export class ErrorNotificationManager {
         level: error.level,
         context: error.context,
         stack: error.detail.stack,
-        timestamp: error.timestamp
+        timestamp: error.timestamp,
       },
       actions: this.getErrorActions(error),
-      autoClose: error.level !== ErrorLevel.CRITICAL
-    });
+      autoClose: error.level !== ErrorLevel.CRITICAL,
+    })
   }
 
   // 获取错误通知类型
@@ -146,14 +151,14 @@ export class ErrorNotificationManager {
     switch (level) {
       case ErrorLevel.DEBUG:
       case ErrorLevel.INFO:
-        return NotificationType.INFO;
+        return NotificationType.INFO
       case ErrorLevel.WARNING:
-        return NotificationType.WARNING;
+        return NotificationType.WARNING
       case ErrorLevel.ERROR:
       case ErrorLevel.CRITICAL:
-        return NotificationType.ERROR;
+        return NotificationType.ERROR
       default:
-        return NotificationType.ERROR;
+        return NotificationType.ERROR
     }
   }
 
@@ -171,15 +176,15 @@ export class ErrorNotificationManager {
       [ErrorType.AUTH_ERROR]: '认证错误',
       [ErrorType.MEMORY_ERROR]: '内存错误',
       [ErrorType.PERFORMANCE_ERROR]: '性能错误',
-      [ErrorType.SYSTEM_ERROR]: '系统错误'
-    };
+      [ErrorType.SYSTEM_ERROR]: '系统错误',
+    }
 
-    return typeNames[error.type] || '未知错误';
+    return typeNames[error.type] || '未知错误'
   }
 
   // 获取错误动作
   private getErrorActions(error: AppError): NotificationAction[] {
-    const actions: NotificationAction[] = [];
+    const actions: NotificationAction[] = []
 
     // 重试动作
     if (error.retryable) {
@@ -187,8 +192,8 @@ export class ErrorNotificationManager {
         label: '重试',
         onClick: () => this.retryError(error),
         icon: '🔄',
-        primary: false
-      });
+        primary: false,
+      })
     }
 
     // 查看详情动作
@@ -196,31 +201,31 @@ export class ErrorNotificationManager {
       label: '查看详情',
       onClick: () => this.showErrorDetails(error),
       icon: '📋',
-      primary: false
-    });
+      primary: false,
+    })
 
     // 复制错误ID
     actions.push({
       label: '复制ID',
       onClick: () => this.copyErrorId(error),
       icon: '📋',
-      primary: false
-    });
+      primary: false,
+    })
 
     // 忽略错误
     actions.push({
       label: '忽略',
       onClick: () => this.dismissNotification(error.errorId),
       icon: '✖️',
-      primary: false
-    });
+      primary: false,
+    })
 
-    return actions;
+    return actions
   }
 
   // 显示通知
   showNotification(data: Partial<NotificationData>): string {
-    const id = data.id || this.generateNotificationId();
+    const id = data.id || this.generateNotificationId()
     const notification: NotificationData = {
       id,
       type: data.type || NotificationType.INFO,
@@ -230,51 +235,53 @@ export class ErrorNotificationManager {
       details: data.details,
       actions: data.actions,
       autoClose: data.autoClose !== false,
-      progress: data.progress
-    };
+      progress: data.progress,
+    }
 
     // 添加到通知列表
-    this.notifications.set(id, notification);
+    this.notifications.set(id, notification)
 
     // 创建通知元素
-    const element = this.createNotificationElement(notification);
+    const element = this.createNotificationElement(notification)
     if (element && this.container) {
-      this.container.appendChild(element);
+      this.container.appendChild(element)
     }
 
     // 播放声音
     if (this.config.enableSound && this.soundEnabled) {
-      this.playNotificationSound(notification.type);
+      this.playNotificationSound(notification.type)
     }
 
     // 显示桌面通知
     if (this.config.enableDesktop && this.desktopEnabled) {
-      this.showDesktopNotification(notification);
+      this.showDesktopNotification(notification)
     }
 
     // 自动关闭
     if (notification.autoClose) {
       setTimeout(() => {
-        this.removeNotification(id);
-      }, this.config.duration);
+        this.removeNotification(id)
+      }, this.config.duration)
     }
 
     // 限制通知数量
-    this.enforceNotificationLimit();
+    this.enforceNotificationLimit()
 
-    return id;
+    return id
   }
 
   // 创建通知元素
-  private createNotificationElement(notification: NotificationData): HTMLElement | null {
-    if (typeof document === 'undefined') return null;
+  private createNotificationElement(
+    notification: NotificationData
+  ): HTMLElement | null {
+    if (typeof document === 'undefined') return null
 
-    const element = document.createElement('div');
-    element.className = `error-notification ${notification.type}`;
-    element.dataset.notificationId = notification.id;
+    const element = document.createElement('div')
+    element.className = `error-notification ${notification.type}`
+    element.dataset.notificationId = notification.id
 
-    const icon = this.getNotificationIcon(notification.type);
-    
+    const icon = this.getNotificationIcon(notification.type)
+
     element.innerHTML = `
       <div class="notification-header">
         <div class="notification-icon">${icon}</div>
@@ -290,7 +297,9 @@ export class ErrorNotificationManager {
         </button>
       </div>
       
-      ${notification.details ? `
+      ${
+        notification.details
+          ? `
         <div class="notification-details">
           <div class="details-toggle" onclick="errorNotificationManager.toggleDetails('${notification.id}')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -302,32 +311,46 @@ export class ErrorNotificationManager {
             <pre>${JSON.stringify(notification.details, null, 2)}</pre>
           </div>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
       
-      ${notification.actions ? `
+      ${
+        notification.actions
+          ? `
         <div class="notification-actions">
-          ${notification.actions.map(action => `
+          ${notification.actions
+            .map(
+              action => `
             <button class="notification-action ${action.primary ? 'primary' : ''}" 
                     onclick="errorNotificationManager.executeAction('${notification.id}', ${action.onClick.toString()})">
               ${action.icon || ''} ${action.label}
             </button>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
-      ` : ''}
+      `
+          : ''
+      }
       
-      ${notification.progress !== undefined ? `
+      ${
+        notification.progress !== undefined
+          ? `
         <div class="notification-progress">
           <div class="progress-bar">
             <div class="progress-fill" style="width: ${notification.progress}%"></div>
           </div>
         </div>
-      ` : ''}
-    `;
+      `
+          : ''
+      }
+    `
 
     // 添加动画
-    element.style.animation = 'slideIn 0.3s ease-out';
+    element.style.animation = 'slideIn 0.3s ease-out'
 
-    return element;
+    return element
   }
 
   // 获取通知图标
@@ -336,9 +359,9 @@ export class ErrorNotificationManager {
       [NotificationType.SUCCESS]: '✅',
       [NotificationType.WARNING]: '⚠️',
       [NotificationType.ERROR]: '❌',
-      [NotificationType.INFO]: 'ℹ️'
-    };
-    return icons[type] || 'ℹ️';
+      [NotificationType.INFO]: 'ℹ️',
+    }
+    return icons[type] || 'ℹ️'
   }
 
   // 播放通知声音
@@ -346,35 +369,36 @@ export class ErrorNotificationManager {
     // 这里可以播放不同的声音文件
     // 目前使用浏览器内置的Audio API
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
+      const audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
       // 根据类型设置不同的频率
       const frequencies = {
         [NotificationType.SUCCESS]: 800,
         [NotificationType.WARNING]: 600,
         [NotificationType.ERROR]: 400,
-        [NotificationType.INFO]: 1000
-      };
-      
-      oscillator.frequency.value = frequencies[type] || 800;
-      oscillator.type = 'sine';
-      gainNode.gain.value = 0.1;
-      
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.1);
+        [NotificationType.INFO]: 1000,
+      }
+
+      oscillator.frequency.value = frequencies[type] || 800
+      oscillator.type = 'sine'
+      gainNode.gain.value = 0.1
+
+      oscillator.start()
+      oscillator.stop(audioContext.currentTime + 0.1)
     } catch (error) {
-      console.error('播放通知声音失败:', error);
+      console.error('播放通知声音失败:', error)
     }
   }
 
   // 显示桌面通知
   private showDesktopNotification(notification: NotificationData): void {
-    if (!('Notification' in window)) return;
+    if (!('Notification' in window)) return
 
     try {
       const notificationInstance = new Notification(notification.title, {
@@ -382,65 +406,67 @@ export class ErrorNotificationManager {
         icon: '/icon48.svg',
         badge: '/icon16.svg',
         tag: notification.id,
-        requireInteraction: !notification.autoClose
-      });
+        requireInteraction: !notification.autoClose,
+      })
 
       notificationInstance.onclick = () => {
-        window.focus();
-        notificationInstance.close();
-      };
+        window.focus()
+        notificationInstance.close()
+      }
     } catch (error) {
-      console.error('显示桌面通知失败:', error);
+      console.error('显示桌面通知失败:', error)
     }
   }
 
   // 移除通知
   removeNotification(id: string): void {
-    const element = document.querySelector(`[data-notification-id="${id}"]`);
+    const element = document.querySelector(`[data-notification-id="${id}"]`)
     if (element) {
-      element.style.animation = 'slideOut 0.3s ease-in';
+      element.style.animation = 'slideOut 0.3s ease-in'
       setTimeout(() => {
-        element.remove();
-      }, 300);
+        element.remove()
+      }, 300)
     }
 
-    this.notifications.delete(id);
+    this.notifications.delete(id)
   }
 
   // 切换详情显示
   toggleDetails(id: string): void {
-    const element = document.querySelector(`[data-notification-id="${id}"]`);
-    if (!element) return;
+    const element = document.querySelector(`[data-notification-id="${id}"]`)
+    if (!element) return
 
-    const detailsContent = element.querySelector('.details-content');
-    const toggleButton = element.querySelector('.details-toggle svg');
-    
+    const detailsContent = element.querySelector('.details-content')
+    const toggleButton = element.querySelector('.details-toggle svg')
+
     if (detailsContent && toggleButton) {
-      const isVisible = detailsContent.style.display !== 'none';
-      detailsContent.style.display = isVisible ? 'none' : 'block';
-      toggleButton.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+      const isVisible = detailsContent.style.display !== 'none'
+      detailsContent.style.display = isVisible ? 'none' : 'block'
+      toggleButton.style.transform = isVisible
+        ? 'rotate(0deg)'
+        : 'rotate(180deg)'
     }
   }
 
   // 执行动作
   executeAction(id: string, action: () => void): void {
     try {
-      action();
-      this.removeNotification(id);
+      action()
+      this.removeNotification(id)
     } catch (error) {
-      console.error('执行通知动作失败:', error);
+      console.error('执行通知动作失败:', error)
     }
   }
 
   // 重试错误
   private retryError(error: AppError): void {
-    console.log('重试错误:', error.errorId);
+    console.log('重试错误:', error.errorId)
     // 这里可以实现重试逻辑
   }
 
   // 显示错误详情
   private showErrorDetails(error: AppError): void {
-    console.log('显示错误详情:', error.errorId);
+    console.log('显示错误详情:', error.errorId)
     // 这里可以打开错误详情模态框
   }
 
@@ -452,134 +478,153 @@ export class ErrorNotificationManager {
           type: NotificationType.SUCCESS,
           title: '复制成功',
           message: '错误ID已复制到剪贴板',
-          autoClose: true
-        });
-      });
+          autoClose: true,
+        })
+      })
     }
   }
 
   // 驳回通知
   private dismissNotification(id: string): void {
-    this.removeNotification(id);
+    this.removeNotification(id)
   }
 
   // 强制通知数量限制
   private enforceNotificationLimit(): void {
-    const notifications = Array.from(this.notifications.values());
+    const notifications = Array.from(this.notifications.values())
     if (notifications.length > this.config.maxNotifications) {
-      const toRemove = notifications.slice(0, notifications.length - this.config.maxNotifications);
+      const toRemove = notifications.slice(
+        0,
+        notifications.length - this.config.maxNotifications
+      )
       toRemove.forEach(notification => {
-        this.removeNotification(notification.id);
-      });
+        this.removeNotification(notification.id)
+      })
     }
   }
 
   // 更新配置
   updateConfig(newConfig: Partial<NotificationConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    this.updateContainerPosition();
-    this.checkBrowserSupport();
+    this.config = { ...this.config, ...newConfig }
+    this.updateContainerPosition()
+    this.checkBrowserSupport()
   }
 
   // 清除所有通知
   clearAllNotifications(): void {
     if (this.container) {
-      this.container.innerHTML = '';
+      this.container.innerHTML = ''
     }
-    this.notifications.clear();
+    this.notifications.clear()
   }
 
   // 获取通知统计
   getNotificationStats(): {
-    total: number;
-    byType: Record<NotificationType, number>;
-    active: number;
+    total: number
+    byType: Record<NotificationType, number>
+    active: number
   } {
-    const notifications = Array.from(this.notifications.values());
-    const byType = {} as Record<NotificationType, number>;
-    
+    const notifications = Array.from(this.notifications.values())
+    const byType = {} as Record<NotificationType, number>
+
     notifications.forEach(notification => {
-      byType[notification.type] = (byType[notification.type] || 0) + 1;
-    });
+      byType[notification.type] = (byType[notification.type] || 0) + 1
+    })
 
     return {
       total: notifications.length,
       byType,
-      active: notifications.filter(n => n.autoClose === false).length
-    };
+      active: notifications.filter(n => n.autoClose === false).length,
+    }
   }
 
   // 生成通知ID
   private generateNotificationId(): string {
-    return `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
   // HTML转义
   private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
   }
 }
 
 // 全局错误通知管理器实例
-export const errorNotificationManager = ErrorNotificationManager.getInstance();
+export const errorNotificationManager = ErrorNotificationManager.getInstance()
 
 // 便捷函数
-export function showError(title: string, message: string, details?: any): string {
+export function showError(
+  title: string,
+  message: string,
+  details?: any
+): string {
   return errorNotificationManager.showNotification({
     type: NotificationType.ERROR,
     title,
     message,
     details,
-    autoClose: false
-  });
+    autoClose: false,
+  })
 }
 
-export function showWarning(title: string, message: string, details?: any): string {
+export function showWarning(
+  title: string,
+  message: string,
+  details?: any
+): string {
   return errorNotificationManager.showNotification({
     type: NotificationType.WARNING,
     title,
     message,
     details,
-    autoClose: true
-  });
+    autoClose: true,
+  })
 }
 
-export function showSuccess(title: string, message: string, details?: any): string {
+export function showSuccess(
+  title: string,
+  message: string,
+  details?: any
+): string {
   return errorNotificationManager.showNotification({
     type: NotificationType.SUCCESS,
     title,
     message,
     details,
-    autoClose: true
-  });
+    autoClose: true,
+  })
 }
 
-export function showInfo(title: string, message: string, details?: any): string {
+export function showInfo(
+  title: string,
+  message: string,
+  details?: any
+): string {
   return errorNotificationManager.showNotification({
     type: NotificationType.INFO,
     title,
     message,
     details,
-    autoClose: true
-  });
+    autoClose: true,
+  })
 }
 
 // 请求桌面通知权限
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!('Notification' in window)) {
-    return false;
+    return false
   }
 
   if (Notification.permission === 'granted') {
-    return true;
+    return true
   }
 
   if (Notification.permission !== 'denied') {
-    const permission = await Notification.requestPermission();
-    return permission === 'granted';
+    const permission = await Notification.requestPermission()
+    return permission === 'granted'
   }
 
-  return false;
+  return false
 }

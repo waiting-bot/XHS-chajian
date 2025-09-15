@@ -1,10 +1,10 @@
 // eslint.config.js
-import globals from 'globals';
-import pluginJs from '@eslint/js';
-import pluginReact from 'eslint-plugin-react';
-import pluginReactHooks from 'eslint-plugin-react-hooks';
-import pluginTypeScript from '@typescript-eslint/eslint-plugin';
-import parserTypeScript from '@typescript-eslint/parser';
+import globals from 'globals'
+import pluginJs from '@eslint/js'
+import pluginReact from 'eslint-plugin-react'
+import pluginReactHooks from 'eslint-plugin-react-hooks'
+import pluginTypeScript from '@typescript-eslint/eslint-plugin'
+import parserTypeScript from '@typescript-eslint/parser'
 
 export default [
   // 1. 全局忽略配置
@@ -107,10 +107,10 @@ export default [
   {
     rules: {
       'no-console': 'warn', // 允许 console 但警告
-      'indent': ['error', 2], // 强制 2 空格缩进
-      'quotes': ['error', 'single'], // 强制单引号
-      'semi': ['error', 'always'], // 强制语句结尾加分号
+      indent: ['error', 2], // 强制 2 空格缩进
+      quotes: ['error', 'single'], // 强制单引号
+      semi: ['error', 'always'], // 强制语句结尾加分号
       'no-unused-vars': 'warn', // 未使用的变量警告（不阻断提交）
     },
   },
-];
+]

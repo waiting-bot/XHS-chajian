@@ -3,11 +3,7 @@
   "name": "小红书笔记采集器",
   "version": "1.0.0",
   "description": "采集小红书笔记数据并写入飞书多维表格",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
-  ],
+  "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://www.xiaohongshu.com/*",
     "https://open.feishu.cn/*"

@@ -10,28 +10,28 @@ const checks = [
   {
     name: 'TypeScript Type Check',
     command: 'pnpm typecheck',
-    description: 'Checking TypeScript compilation'
+    description: 'Checking TypeScript compilation',
   },
   {
     name: 'ESLint Check',
     command: 'pnpm lint',
-    description: 'Running ESLint'
+    description: 'Running ESLint',
   },
   {
     name: 'Prettier Format Check',
     command: 'pnpm format --check',
-    description: 'Checking code formatting'
+    description: 'Checking code formatting',
   },
   {
     name: 'Unit Tests',
     command: 'pnpm test:run',
-    description: 'Running unit tests'
+    description: 'Running unit tests',
   },
   {
     name: 'Build Check',
     command: 'pnpm build',
-    description: 'Building project'
-  }
+    description: 'Building project',
+  },
 ]
 
 let allPassed = true
@@ -39,7 +39,7 @@ let allPassed = true
 for (const check of checks) {
   console.log(`📋 ${check.name}`)
   console.log(`   ${check.description}...`)
-  
+
   try {
     const startTime = Date.now()
     execSync(check.command, { stdio: 'inherit' })

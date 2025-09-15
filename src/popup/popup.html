@@ -1,239 +1,26 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>小红书笔记采集器</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-  <style>
-    .container { 
-      padding: 1rem; 
-      text-align: center; 
-      min-width: 320px;
-      max-width: 400px;
-    }
-    .status { 
-      margin: 1rem 0; 
-      padding: 1rem; 
-      border-radius: 8px;
-      font-weight: 500;
-    }
-    .success { 
-      background: #d4edda; 
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-    .error { 
-      background: #f8d7da; 
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-    .loading { 
-      background: #fff3cd; 
-      color: #856404;
-      border: 1px solid #ffeaa7;
-    }
-    .btn-primary {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      width: 100%;
-      margin: 0.5rem 0;
-    }
-    .btn-primary:hover {
-      background: #0056b3;
-    }
-    .btn-primary:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
-    }
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      width: 100%;
-      margin: 0.5rem 0;
-    }
-    .btn-secondary:hover {
-      background: #545b62;
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 1.5rem 1rem;
-      margin: -1rem -1rem 1rem -1rem;
-      border-radius: 8px 8px 0 0;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 1.2rem;
-      font-weight: 600;
-    }
-    .header p {
-      margin: 0.5rem 0 0 0;
-      opacity: 0.9;
-      font-size: 0.9rem;
-    }
-    .config-section {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 1rem 0;
-      text-align: left;
-    }
-    .config-section h3 {
-      margin: 0 0 1rem 0;
-      color: #495057;
-    }
-    .config-status {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .status-online { background: #28a745; }
-    .status-offline { background: #dc3545; }
-    .footer {
-      margin-top: 1.5rem;
-      padding-top: 1rem;
-      border-top: 1px solid #e9ecef;
-      font-size: 0.8rem;
-      color: #6c757d;
-    }
-    .info-item {
-      text-align: left;
-      margin: 0.5rem 0;
-      padding: 0.5rem;
-      background: #f8f9fa;
-      border-radius: 4px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- 顶部标题栏 -->
-    <div class="header">
-      <h1>📱 小红书采集器</h1>
-      <p>智能笔记数据采集工具</p>
-    </div>
-
-    <!-- 主要内容区域 -->
-    <main>
-      <!-- 页面状态卡片 -->
-      <div id="pageStatus" class="status loading">
-        <div class="loading-spinner">⏳</div>
-        <div>正在检测小红书笔记页面...</div>
-      </div>
-      
-      <!-- 页面信息卡片 -->
-      <div id="pageInfo" style="display: none;">
-        <div class="info-item">
-          <strong>📄 笔记标题:</strong> <span id="noteTitle">-</span>
-        </div>
-        <div class="info-item">
-          <strong>👤 作者:</strong> <span id="noteAuthor">-</span>
-        </div>
-      </div>
-
-      <!-- 配置状态卡片 -->
-      <div class="config-section">
-        <h3>🔧 配置状态</h3>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小红书采集器</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h3>小红书采集器</h3>
         <div class="config-status" id="configStatus">
-          <span class="status-dot status-offline"></span>
-          <span>正在检查配置...</span>
+          <!-- 状态将动态渲染在这里 -->
         </div>
+      </header>
+
+      <div class="actions">
+        <button id="refreshConfig" class="secondary">刷新状态</button>
+        <button id="openOptions" class="primary">配置插件</button>
       </div>
-
-      <!-- 主要操作按钮 -->
-      <button id="collectBtn" class="btn-primary" disabled>
-        🚀 采集当前笔记
-      </button>
-      
-      <button id="openOptions" class="btn-secondary">
-        ⚙️ 配置插件
-      </button>
-      
-      <button id="refreshBtn" class="btn-secondary">
-        🔄 刷新状态
-      </button>
-    </main>
-
-    <!-- 底部状态栏 -->
-    <div class="footer">
-      <div id="footerStatus">就绪</div>
     </div>
-  </div>
-  
-  <script type="module" src="popup.ts"></script>
-  <script>
-    // 防止popup自动关闭的简单脚本
-    document.addEventListener('DOMContentLoaded', function() {
-      // 处理配置插件按钮
-      const openOptionsBtn = document.getElementById('openOptions');
-      if (openOptionsBtn) {
-        openOptionsBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          
-          // 在新标签页中打开配置页面
-          chrome.runtime.openOptionsPage();
-          
-          // 显示提示信息
-          const originalText = this.textContent;
-          this.textContent = '✅ 配置页面已打开';
-          this.disabled = true;
-          
-          // 3秒后恢复按钮状态
-          setTimeout(() => {
-            this.textContent = originalText;
-            this.disabled = false;
-          }, 3000);
-        });
-      }
-      
-      // 处理刷新按钮
-      const refreshBtn = document.getElementById('refreshBtn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          
-          const originalText = this.textContent;
-          this.textContent = '🔄 刷新中...';
-          this.disabled = true;
-          
-          // 显示刷新状态
-          const statusEl = document.getElementById('pageStatus');
-          if (statusEl) {
-            statusEl.className = 'status loading';
-            statusEl.innerHTML = '<div class="loading-spinner">⏳</div><div>正在刷新状态...</div>';
-          }
-          
-          // 重新加载页面状态
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        });
-      }
-      
-      // 添加提示信息
-      const footerStatus = document.getElementById('footerStatus');
-      if (footerStatus) {
-        footerStatus.innerHTML = '💡 提示：点击配置按钮不会关闭此窗口';
-      }
-    });
-  </script>
-</body>
+
+    <script type="module" src="popup.ts"></script>
+  </body>
 </html>

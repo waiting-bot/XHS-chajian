@@ -1,7 +1,7 @@
 {
   "root": true,
-  "env": { 
-    "browser": true, 
+  "env": {
+    "browser": true,
     "es2020": true,
     "node": true
   },
@@ -13,54 +13,51 @@
     "plugin:import/typescript",
     "plugin:promise/recommended"
   ],
-  "ignorePatterns": [
-    "dist", 
-    ".eslintrc.cjs",
-    "node_modules",
-    "coverage"
-  ],
+  "ignorePatterns": ["dist", ".eslintrc.cjs", "node_modules", "coverage"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 2020,
     "sourceType": "module",
     "project": "./tsconfig.json"
   },
-  "plugins": [
-    "@typescript-eslint",
-    "import",
-    "promise"
-  ],
+  "plugins": ["@typescript-eslint", "import", "promise"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_" }
+    ],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-empty-interface": "warn",
     "@typescript-eslint/no-non-null-assertion": "warn",
     "@typescript-eslint/ban-ts-comment": "warn",
-    
-    "import/order": ["error", {
-      "groups": [
-        "builtin",
-        "external",
-        "internal",
-        "parent",
-        "sibling",
-        "index"
-      ],
-      "newlines-between": "always"
-    }],
+
+    "import/order": [
+      "error",
+      {
+        "groups": [
+          "builtin",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "index"
+        ],
+        "newlines-between": "always"
+      }
+    ],
     "import/no-unresolved": "off",
     "import/namespace": "error",
     "import/default": "error",
     "import/no-deprecated": "warn",
-    
+
     "promise/always-return": "error",
     "promise/no-return-wrap": "error",
     "promise/param-names": "error",
     "promise/catch-or-return": "error",
     "promise/no-native": "off",
-    
+
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "no-debugger": "error",
     "no-var": "error",
