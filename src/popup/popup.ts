@@ -162,7 +162,7 @@ class PopupManager {
     document.getElementById('toggleSecret')?.addEventListener('click', () => this.togglePasswordVisibility('appSecret'))
 
     // 存储变化监听
-    chrome.storage.onChanged.addListener((changes) => this.onStorageChanged(changes))
+    chrome.storage.onChanged.addListener((changes, namespace) => this.onStorageChanged(changes, namespace))
     
     // 消息监听
     chrome.runtime.onMessage.addListener((message) => this.onMessage(message))
@@ -557,18 +557,41 @@ class PopupManager {
     }
   }
 
-  // 从存储加载配置
+  // 从存储加载配置 - 增强版本
   private async loadConfigsFromStorage(): Promise<any> {
     try {
-      const result = await chrome.storage.sync.get('feishuConfigs')
+      // 同时检查 sync 和 local 存储
+      const [syncResult, localResult] = await Promise.all([
+        chrome.storage.sync.get('feishuConfigs'),
+        chrome.storage.local.get('feishuConfigs')
+      ])
       
-      if (!result.feishuConfigs) {
-        console.warn('[PopupManager] 没有找到配置')
+      console.log('[PopupManager] Sync存储结果:', syncResult)
+      console.log('[PopupManager] Local存储结果:', localResult)
+      
+      // 优先使用 sync 存储的配置，如果没有则使用 local 存储
+      let configData = syncResult.feishuConfigs || localResult.feishuConfigs
+      
+      if (!configData) {
+        // 如果还是没找到，检查其他可能的键名
+        const [syncConfigs, localConfigs] = await Promise.all([
+          chrome.storage.sync.get('CONFIG_LIST'),
+          chrome.storage.local.get('CONFIG_LIST')
+        ])
+        
+        configData = syncConfigs.CONFIG_LIST || localConfigs.CONFIG_LIST
+        console.log('[PopupManager] CONFIG_LIST检查结果:', configData)
+      }
+      
+      if (!configData) {
+        console.warn('[PopupManager] 没有找到任何配置')
         return {}
       }
       
       // 验证并解析配置
-      return this.parseConfigs(result.feishuConfigs)
+      const parsedConfigs = this.parseConfigs(configData)
+      console.log('[PopupManager] 解析后的配置:', parsedConfigs)
+      return parsedConfigs
     } catch (error) {
       console.error('配置加载失败:', error)
       return {}
@@ -786,7 +809,7 @@ class PopupManager {
       })
       
       // 重新加载配置列表
-      await this.loadConfigs()
+      await this.loadConfigurations()
       
       // 更新配置状态
       await this.updateConfigStatus()
@@ -1089,12 +1112,13 @@ class PopupManager {
     }
   }
 
-  // 事件处理
-  private onStorageChanged(changes: {[key: string]: chrome.storage.StorageChange}) {
-    const configKeys = ['feishuTableUrl', 'feishuAppSecret', 'feishuAppId', 'feishuConfigs']
+  // 事件处理 - 增强的存储变化监听
+  private onStorageChanged(changes: {[key: string]: chrome.storage.StorageChange}, namespace: string) {
+    const configKeys = ['feishuTableUrl', 'feishuAppSecret', 'feishuAppId', 'feishuConfigs', 'CONFIG_LIST']
     const hasConfigChange = configKeys.some(key => key in changes)
     
     if (hasConfigChange) {
+      console.log('[PopupManager] 检测到配置存储变化:', Object.keys(changes))
       this.updateConfigStatus()
       this.loadConfigurations()
     }
@@ -1221,7 +1245,7 @@ class PopupManager {
     }
   }
 
-  // 检查存储的调试功能
+  // 检查存储的调试功能 - 增强版本
   private async debugStorage() {
     console.log('[Debug] 开始检查存储...')
     
@@ -1244,19 +1268,36 @@ class PopupManager {
       }
       console.log('[Debug] localStorage 数据:', localStorageData)
       
-      // 计算配置数量
-      const feishuConfigs = syncData.feishuConfigs || {}
-      const configCount = typeof feishuConfigs === 'string' ? 
-        JSON.parse(feishuConfigs) : feishuConfigs
-      const actualConfigCount = Object.keys(configCount).length
+      // 计算配置数量 - 检查多种可能的配置键名
+      let configCount = 0
+      let configSource = ''
       
-      // 显示汇总信息
+      if (syncData.feishuConfigs) {
+        const configs = typeof syncData.feishuConfigs === 'string' ? 
+          JSON.parse(syncData.feishuConfigs) : syncData.feishuConfigs
+        configCount = Object.keys(configs).length
+        configSource = 'feishuConfigs (sync)'
+      } else if (localData.feishuConfigs) {
+        const configs = typeof localData.feishuConfigs === 'string' ? 
+          JSON.parse(localData.feishuConfigs) : localData.feishuConfigs
+        configCount = Object.keys(configs).length
+        configSource = 'feishuConfigs (local)'
+      } else if (syncData.CONFIG_LIST) {
+        configCount = Array.isArray(syncData.CONFIG_LIST) ? syncData.CONFIG_LIST.length : 0
+        configSource = 'CONFIG_LIST (sync)'
+      } else if (localData.CONFIG_LIST) {
+        configCount = Array.isArray(localData.CONFIG_LIST) ? localData.CONFIG_LIST.length : 0
+        configSource = 'CONFIG_LIST (local)'
+      }
+      
+      // 显示详细汇总信息
       const summary = `
-存储检查结果:
+🔍 存储诊断报告:
 
 📊 Chrome Sync 存储:
-- 配置数量: ${actualConfigCount}
+- 配置数量: ${configCount} (${configSource})
 - 键数量: ${Object.keys(syncData).length}
+- 配置详情: ${configCount > 0 ? '请查看控制台' : '无配置'}
 
 📊 Chrome Local 存储:
 - 键数量: ${Object.keys(localData).length}
@@ -1264,7 +1305,22 @@ class PopupManager {
 📊 LocalStorage:
 - 键数量: ${Object.keys(localStorageData).length}
 
-🔍 详细信息请查看控制台
+⚠️  诊断结果:
+${configCount > 0 ? 
+  `✅ 找到 ${configCount} 条配置，来源: ${configSource}` : 
+  `❌ 未找到任何配置，请检查配置是否正确保存`
+}
+
+🔧 建议:
+${configCount === 0 ? 
+  `1. 前往配置页面添加配置
+2. 确保配置正确保存
+3. 重新加载插件` : 
+  `1. 配置已找到，如果下拉框仍为空，请检查UI渲染逻辑
+2. 尝试点击刷新配置按钮`
+}
+
+📱 详细存储数据请查看浏览器控制台 (F12)
       `
       
       alert(summary)

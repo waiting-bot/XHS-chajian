@@ -7,7 +7,7 @@ const chrome = window.chrome;
   if (window.hasRunXhsChajianContentScript) return;
   window.hasRunXhsChajianContentScript = true;
 
-  // 接口定义
+    // 接口定义
   interface PageInfo {
     isNotePage: boolean
     url: string
