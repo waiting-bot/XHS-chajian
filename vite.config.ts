@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
   build: {
@@ -8,14 +9,44 @@ export default defineConfig({
       input: {
         'content/content': './src/content/content.ts',
         'background/background': './src/background/background.ts',
-        'popup/popup': './src/popup/popup.ts'
+        'popup/popup': './src/popup/popup.ts',
+        'popup/popup.html': './src/popup/popup.html',
+        'options/options': './src/options/options.ts',
+        'options/options.html': './src/options/options.html'
       },
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name.endsWith('.css')) {
+            return 'content/[name][extname]'
+          }
+          return 'assets/[name].[ext]'
+        }
       }
     }
   },
-  publicDir: 'src/assets'
+  publicDir: 'src/assets',
+  plugins: [
+    {
+      name: 'copy-css-files',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'content/content.css',
+          source: require('fs').readFileSync('./src/content/content.css', 'utf8')
+        })
+      }
+    },
+    {
+      name: 'copy-manifest',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'manifest.json',
+          source: JSON.stringify(require('./src/manifest.json'), null, 2)
+        })
+      }
+    }
+  ]
 })

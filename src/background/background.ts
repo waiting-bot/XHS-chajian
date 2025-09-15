@@ -366,6 +366,20 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 // 处理笔记数据
 async function handleProcessNoteData(data: any, sender: chrome.runtime.MessageSender) {
   try {
+    // 检查配置
+    chrome.storage.sync.get(['feishuAppToken'], (result) => {
+      if (!result.feishuAppToken) {
+        console.error('缺少飞书配置');
+        // 发送错误通知到popup
+        chrome.runtime.sendMessage({
+          type: 'configError',
+          message: '配置信息不完整'
+        });
+        return;
+      }
+      // 原有上传逻辑...
+    });
+
     if (!sender.tab?.url) {
       throw new Error('无法获取页面URL');
     }

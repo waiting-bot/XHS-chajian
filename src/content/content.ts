@@ -45,7 +45,7 @@ class PageDetector {
 
     this.pageStatus.url = url;
 
-    if (hostname === 'www.xiaohongshu.com' && pathname.startsWith('/explore/')) {
+    if (hostname === 'www.xiaohongshu.com' && this.isNotePage()) {
       this.pageStatus.isNotePage = true;
       this.pageStatus.type = 'note';
       this.pageStatus.pageId = this.extractPageId(pathname);
@@ -56,9 +56,39 @@ class PageDetector {
     }
   }
 
+  // 检测是否在笔记页面
+  private isNotePage(): boolean {
+    // URL模式匹配
+    const noteUrlPatterns = [
+      /https:\/\/www\.xiaohongshu\.com\/discovery\/item\/[a-z0-9]+/i,
+      /https:\/\/www\.xiaohongshu\.com\/explore\/[a-z0-9]+/i,
+      /https:\/\/www\.xiaohongshu\.com\/user\/profile\/[a-z0-9]+\/post\/[a-z0-9]+/i
+    ];
+    
+    // 页面元素检测 - 更新为小红书当前页面结构
+    const hasNoteContent = !!document.querySelector('[class*="note-detail"], [class*="note-container"], [class*="detail-container"]');
+    const hasNoteImages = !!document.querySelector('[class*="swiper-wrapper"], [class*="image-container"], [class*="media-container"]');
+    const hasNoteTitle = !!document.querySelector('h1[class*="title"], [class*="note-title"], [class*="detail-title"]');
+    
+    return noteUrlPatterns.some(pattern => pattern.test(location.href)) 
+      && (hasNoteContent || hasNoteImages || hasNoteTitle);
+  }
+
   private extractPageId(pathname: string): string | null {
-    const match = pathname.match(/\/explore\/([a-f0-9]+)/);
-    return match ? match[1] : null;
+    // 支持多种URL格式的页面ID提取
+    const patterns = [
+      /\/explore\/([a-f0-9]+)/,
+      /\/discovery\/item\/([a-f0-9]+)/,
+      /\/user\/profile\/[a-z0-9]+\/post\/([a-f0-9]+)/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = pathname.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    return null;
   }
 
   private sendPageStatus(): void {
@@ -241,6 +271,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ status: pageDetector.getPageStatus() });
     break;
   case 'COLLECT_NOTE_DATA':
+    // 当收到采集消息时
+    if (!pageDetector.isNotePage()) {
+      // 发送错误状态到popup
+      chrome.runtime.sendMessage({
+        type: 'pageError',
+        message: '当前页面不是小红书笔记'
+      });
+      sendResponse({ success: false, error: '当前页面不是小红书笔记' });
+      return;
+    }
+    
     dataCollector.collectNoteData().then(data => {
       sendResponse({ success: true, data });
     }).catch(error => {

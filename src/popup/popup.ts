@@ -361,6 +361,19 @@ class PopupManager {
       return;
     }
 
+    // 检查配置是否存在
+    const config = await chrome.storage.sync.get([
+      'feishuAppToken', 
+      'feishuPersonalBaseToken',
+      'feishuTableId'
+    ]);
+    
+    if (!config.feishuAppToken || !config.feishuPersonalBaseToken) {
+      // 显示友好提示并引导到配置页
+      this.showConfigError('请先完成飞书配置');
+      return;
+    }
+
     // 检查配置
     let activeConfig;
     try {
@@ -1190,6 +1203,68 @@ class PopupManager {
     return div.innerHTML;
   }
 
+  // 显示配置错误提示
+  private showConfigError(message: string): void {
+    const errorEl = document.createElement('div');
+    errorEl.className = 'config-error';
+    errorEl.innerHTML = `
+      <div class="error-content">
+        <div class="error-icon">⚠️</div>
+        <div class="error-message">${message}</div>
+        <button id="goToConfig" class="error-action">前往配置</button>
+      </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+      .config-error {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+      }
+      .error-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .error-icon {
+        font-size: 24px;
+      }
+      .error-message {
+        flex: 1;
+        font-weight: 500;
+        color: #856404;
+      }
+      .error-action {
+        background: #fd7e14;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      .error-action:hover {
+        background: #e8680f;
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(errorEl);
+    
+    document.getElementById('goToConfig')?.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
+  }
+
   // 获取当前页面URL
   private getCurrentPageUrl(): string | undefined {
     // 这里可以通过Chrome API获取当前页面URL
@@ -1345,8 +1420,87 @@ function closeImportExport(): void {
   }
 }
 
-// 初始化Popup管理器
-document.addEventListener('DOMContentLoaded', () => {
+// 添加页面状态检测逻辑到popup.ts
+document.addEventListener('DOMContentLoaded', async () => {
+  const statusEl = document.getElementById('pageStatus') as HTMLDivElement;
+  const pageInfo = document.getElementById('pageInfo') as HTMLDivElement;
+  const collectBtn = document.getElementById('collectBtn') as HTMLButtonElement;
+  const configStatus = document.getElementById('configStatus') as HTMLDivElement;
+  const footerStatus = document.getElementById('footerStatus') as HTMLDivElement;
+  const openOptionsBtn = document.getElementById('openOptions') as HTMLButtonElement;
+  const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
+  
+  // 检查当前标签页是否为小红书笔记
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  
+  if (tab.url && tab.url.includes('xiaohongshu.com/explore/')) {
+    statusEl.textContent = '✅ 已检测到小红书笔记页面';
+    statusEl.className = 'status success';
+    pageInfo.style.display = 'block';
+    collectBtn.disabled = false;
+    footerStatus.textContent = '准备就绪';
+  } else if (tab.url && tab.url.includes('xiaohongshu.com/discovery/item/')) {
+    statusEl.textContent = '✅ 已检测到小红书笔记页面';
+    statusEl.className = 'status success';
+    pageInfo.style.display = 'block';
+    collectBtn.disabled = false;
+    footerStatus.textContent = '准备就绪';
+  } else {
+    statusEl.textContent = '❌ 未检测到小红书笔记页面';
+    statusEl.className = 'status error';
+    pageInfo.style.display = 'none';
+    collectBtn.disabled = true;
+    footerStatus.textContent = '请访问小红书笔记页面';
+  }
+  
+  // 检查配置状态
+  const config = await chrome.storage.sync.get([
+    'feishuAppToken', 
+    'feishuPersonalBaseToken',
+    'feishuTableId'
+  ]);
+  
+  if (config.feishuAppToken && config.feishuPersonalBaseToken) {
+    configStatus.innerHTML = `
+      <span class="status-dot status-online"></span>
+      <span>✅ 配置已就绪</span>
+    `;
+  } else {
+    configStatus.innerHTML = `
+      <span class="status-dot status-offline"></span>
+      <span>❌ 配置未完成</span>
+    `;
+  }
+  
+  // 打开配置页按钮
+  openOptionsBtn.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+  
+  // 刷新状态按钮
+  refreshBtn.addEventListener('click', async () => {
+    statusEl.textContent = '🔄 正在刷新...';
+    statusEl.className = 'status loading';
+    
+    // 重新检查页面状态
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (tab.url && (tab.url.includes('xiaohongshu.com/explore/') || tab.url.includes('xiaohongshu.com/discovery/item/'))) {
+      statusEl.textContent = '✅ 已检测到小红书笔记页面';
+      statusEl.className = 'status success';
+      pageInfo.style.display = 'block';
+      collectBtn.disabled = false;
+      footerStatus.textContent = '准备就绪';
+    } else {
+      statusEl.textContent = '❌ 未检测到小红书笔记页面';
+      statusEl.className = 'status error';
+      pageInfo.style.display = 'none';
+      collectBtn.disabled = true;
+      footerStatus.textContent = '请访问小红书笔记页面';
+    }
+  });
+  
+  // 初始化原有的Popup管理器
   const manager = new PopupManager();
   (window as any).popupManager = manager;
 });

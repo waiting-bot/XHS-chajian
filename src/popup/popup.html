@@ -4,384 +4,236 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>小红书笔记采集器</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    .container { 
+      padding: 1rem; 
+      text-align: center; 
+      min-width: 320px;
+      max-width: 400px;
+    }
+    .status { 
+      margin: 1rem 0; 
+      padding: 1rem; 
+      border-radius: 8px;
+      font-weight: 500;
+    }
+    .success { 
+      background: #d4edda; 
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error { 
+      background: #f8d7da; 
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .loading { 
+      background: #fff3cd; 
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .btn-primary {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      width: 100%;
+      margin: 0.5rem 0;
+    }
+    .btn-primary:hover {
+      background: #0056b3;
+    }
+    .btn-primary:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      width: 100%;
+      margin: 0.5rem 0;
+    }
+    .btn-secondary:hover {
+      background: #545b62;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1.5rem 1rem;
+      margin: -1rem -1rem 1rem -1rem;
+      border-radius: 8px 8px 0 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .header p {
+      margin: 0.5rem 0 0 0;
+      opacity: 0.9;
+      font-size: 0.9rem;
+    }
+    .config-section {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      text-align: left;
+    }
+    .config-section h3 {
+      margin: 0 0 1rem 0;
+      color: #495057;
+    }
+    .config-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-online { background: #28a745; }
+    .status-offline { background: #dc3545; }
+    .footer {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e9ecef;
+      font-size: 0.8rem;
+      color: #6c757d;
+    }
+    .info-item {
+      text-align: left;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-  <div class="app-container">
+  <div class="container">
     <!-- 顶部标题栏 -->
-    <header class="app-header">
-      <div class="header-content">
-        <div class="app-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
-            <path d="M2 17L12 22L22 17"/>
-            <path d="M2 12L12 17L22 12"/>
-          </svg>
-        </div>
-        <div class="app-title">
-          <h1>小红书采集器</h1>
-          <p class="app-subtitle">智能笔记数据采集工具</p>
-        </div>
-      </div>
-    </header>
+    <div class="header">
+      <h1>📱 小红书采集器</h1>
+      <p>智能笔记数据采集工具</p>
+    </div>
 
     <!-- 主要内容区域 -->
-    <main class="app-main">
+    <main>
       <!-- 页面状态卡片 -->
-      <div class="status-card">
-        <div class="card-header">
-          <div class="status-indicator" id="statusIndicator">
-            <div class="indicator-dot loading"></div>
-            <span class="status-text">检测中...</span>
-          </div>
-          <div class="card-actions">
-            <button class="icon-button" onclick="refreshPageStatus()" title="刷新状态">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 4v6h6M23 20v-6h-6"/>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-              </svg>
-            </button>
-          </div>
+      <div id="pageStatus" class="status loading">
+        <div class="loading-spinner">⏳</div>
+        <div>正在检测小红书笔记页面...</div>
+      </div>
+      
+      <!-- 页面信息卡片 -->
+      <div id="pageInfo" style="display: none;">
+        <div class="info-item">
+          <strong>📄 笔记标题:</strong> <span id="noteTitle">-</span>
         </div>
-        
-        <div class="card-content" id="pageCardContent">
-          <div class="loading-state">
-            <div class="loading-spinner"></div>
-            <p>正在分析当前页面...</p>
-          </div>
-          
-          <div class="page-info" id="pageInfo" style="display: none;">
-            <div class="info-item">
-              <div class="info-icon">📄</div>
-              <div class="info-details">
-                <div class="info-label">笔记标题</div>
-                <div class="info-value" id="noteTitle">-</div>
-              </div>
-            </div>
-            <div class="info-item">
-              <div class="info-icon">👤</div>
-              <div class="info-details">
-                <div class="info-label">作者</div>
-                <div class="info-value" id="noteAuthor">-</div>
-              </div>
-            </div>
-          </div>
+        <div class="info-item">
+          <strong>👤 作者:</strong> <span id="noteAuthor">-</span>
         </div>
       </div>
 
-      <!-- 数据预览卡片 -->
-      <div class="preview-card" id="previewCard" style="display: none;">
-        <div class="card-header">
-          <h3 class="card-title">数据预览</h3>
-          <button class="expand-button" onclick="toggleCard('previewContent')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="card-content expanded" id="previewContent">
-          <div class="preview-grid" id="previewGrid">
-            <!-- 动态生成的预览内容 -->
-          </div>
+      <!-- 配置状态卡片 -->
+      <div class="config-section">
+        <h3>🔧 配置状态</h3>
+        <div class="config-status" id="configStatus">
+          <span class="status-dot status-offline"></span>
+          <span>正在检查配置...</span>
         </div>
       </div>
 
-      <!-- 主要操作区域 -->
-      <div class="action-section">
-        <button class="primary-button" id="collectBtn" disabled>
-          <span class="button-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </span>
-          <span class="button-text">采集数据</span>
-        </button>
-        
-        <button class="secondary-button" id="addNoteBtn" disabled>
-          <span class="button-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-          </span>
-          <span class="button-text">添加备注</span>
-        </button>
-      </div>
-
-      <!-- 备注编辑器 -->
-      <div class="note-editor" id="noteEditor" style="display: none;">
-        <div class="editor-header">
-          <h3 class="editor-title">备注编辑器</h3>
-          <button class="close-button" onclick="closeNoteEditor()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="editor-content">
-          <div class="input-group">
-            <textarea 
-              id="noteInput"
-              class="modern-textarea"
-              placeholder="在这里输入你的备注..."
-              rows="4"
-              maxlength="500"
-            ></textarea>
-            <div class="input-footer">
-              <div class="char-counter">
-                <span id="charCount">0</span>
-                <span class="max-chars">/ 500</span>
-              </div>
-              <div class="auto-save-indicator" id="autoSaveIndicator">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
-                <span>已自动保存</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="note-options">
-            <div class="category-selector">
-              <label class="selector-label">类型</label>
-              <div class="category-pills">
-                <label class="category-pill">
-                  <input type="radio" name="noteCategory" value="general" checked>
-                  <span class="pill-content">📝 一般</span>
-                </label>
-                <label class="category-pill">
-                  <input type="radio" name="noteCategory" value="priority">
-                  <span class="pill-content">⭐ 重要</span>
-                </label>
-                <label class="category-pill">
-                  <input type="radio" name="noteCategory" value="question">
-                  <span class="pill-content">❓ 疑问</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="tag-selector">
-              <label class="selector-label">标签</label>
-              <div class="tag-chips" id="tagChips">
-                <div class="tag-chip" data-tag="重要">重要</div>
-                <div class="tag-chip" data-tag="待处理">待处理</div>
-                <div class="tag-chip" data-tag="已审核">已审核</div>
-                <div class="tag-chip" data-tag="需要跟进">需要跟进</div>
-              </div>
-              <div class="selected-tags" id="selectedTags"></div>
-            </div>
-          </div>
-
-          <div class="editor-actions">
-            <button class="ghost-button" onclick="clearNote()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              </svg>
-              清空
-            </button>
-            
-            <button class="ghost-button" onclick="showNoteHistory()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 20V10M6 20V4M18 20v-6"/>
-              </svg>
-              历史
-            </button>
-            
-            <button class="primary-button" onclick="saveNote()">
-              <span class="button-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-              </span>
-              <span class="button-text">保存备注</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 历史记录面板 -->
-        <div class="history-panel" id="historyPanel" style="display: none;">
-          <div class="history-header">
-            <h4>备注历史</h4>
-            <button class="close-button" onclick="hideNoteHistory()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-          <div class="history-list" id="historyList">
-            <div class="empty-state">暂无历史记录</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 配置面板 -->
-      <div class="config-card">
-        <div class="card-header">
-          <h3 class="card-title">飞书配置</h3>
-          <button class="expand-button" onclick="toggleCard('configContent')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="card-content" id="configContent">
-          <div class="config-selector">
-            <label class="selector-label">配置文件</label>
-            <div class="config-selector-group">
-              <select class="modern-select" id="configSelect">
-                <option value="">暂无配置</option>
-              </select>
-              <div class="config-manager-buttons">
-                <button class="icon-button" onclick="createNewConfig()" title="新建配置">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                </button>
-                <button class="icon-button" onclick="exportConfig()" title="导出配置">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </button>
-                <button class="icon-button" onclick="importConfig()" title="导入配置">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="config-form">
-            <div class="form-field">
-              <label class="field-label">配置名称</label>
-              <input type="text" class="modern-input" id="configName" placeholder="我的飞书配置">
-            </div>
-            
-            <div class="form-field">
-              <label class="field-label">App ID</label>
-              <input type="text" class="modern-input" id="appId" placeholder="cli_a1b2c3d4...">
-            </div>
-            
-            <div class="form-field">
-              <label class="field-label">表格 ID</label>
-              <input type="text" class="modern-input" id="tableId" placeholder="tbl_x7y8z9a0...">
-            </div>
-            
-            <div class="form-field">
-              <label class="field-label">Access Token</label>
-              <div class="password-input">
-                <input type="password" class="modern-input" id="accessToken" placeholder="请输入访问令牌">
-                <button class="password-toggle" onclick="togglePassword()">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            
-            <div class="config-actions">
-              <button class="secondary-button" onclick="testConnection()">
-                <span class="button-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                </span>
-                <span class="button-text">测试连接</span>
-              </button>
-              
-              <button class="primary-button" onclick="saveConfig()">
-                <span class="button-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                    <polyline points="17 21 17 13 7 13 7 21"/>
-                    <polyline points="7 3 7 8 15 8"/>
-                  </svg>
-                </span>
-                <span class="button-text">保存配置</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 配置管理面板 -->
-      <div class="config-management-panel" id="configManagementPanel" style="display: none;">
-        <div class="panel-header">
-          <h3 class="panel-title">配置管理</h3>
-          <button class="close-button" onclick="closeConfigManagement()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="panel-content">
-          <div class="config-list" id="configList">
-            <!-- 动态生成的配置列表 -->
-          </div>
-          
-          <div class="config-stats">
-            <div class="stat-item">
-              <span class="stat-label">总配置数:</span>
-              <span class="stat-value" id="totalConfigs">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">活动配置:</span>
-              <span class="stat-value" id="activeConfigs">0</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 导入导出面板 -->
-      <div class="import-export-panel" id="importExportPanel" style="display: none;">
-        <div class="panel-header">
-          <h3 class="panel-title" id="importExportTitle">导入配置</h3>
-          <button class="close-button" onclick="closeImportExport()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="panel-content">
-          <div class="import-export-content" id="importExportContent">
-            <!-- 动态生成的内容 -->
-          </div>
-        </div>
-      </div>
+      <!-- 主要操作按钮 -->
+      <button id="collectBtn" class="btn-primary" disabled>
+        🚀 采集当前笔记
+      </button>
+      
+      <button id="openOptions" class="btn-secondary">
+        ⚙️ 配置插件
+      </button>
+      
+      <button id="refreshBtn" class="btn-secondary">
+        🔄 刷新状态
+      </button>
     </main>
 
     <!-- 底部状态栏 -->
-    <footer class="app-footer">
-      <div class="footer-content">
-        <div class="status-text" id="footerStatus">就绪</div>
-        <div class="footer-actions">
-          <div class="connection-status" id="connectionStatus">
-            <div class="status-dot offline"></div>
-            <span>未连接</span>
-          </div>
-        </div>
-      </div>
-    </footer>
+    <div class="footer">
+      <div id="footerStatus">就绪</div>
+    </div>
   </div>
   
   <script type="module" src="popup.ts"></script>
+  <script>
+    // 防止popup自动关闭的简单脚本
+    document.addEventListener('DOMContentLoaded', function() {
+      // 处理配置插件按钮
+      const openOptionsBtn = document.getElementById('openOptions');
+      if (openOptionsBtn) {
+        openOptionsBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          // 在新标签页中打开配置页面
+          chrome.runtime.openOptionsPage();
+          
+          // 显示提示信息
+          const originalText = this.textContent;
+          this.textContent = '✅ 配置页面已打开';
+          this.disabled = true;
+          
+          // 3秒后恢复按钮状态
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.disabled = false;
+          }, 3000);
+        });
+      }
+      
+      // 处理刷新按钮
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          const originalText = this.textContent;
+          this.textContent = '🔄 刷新中...';
+          this.disabled = true;
+          
+          // 显示刷新状态
+          const statusEl = document.getElementById('pageStatus');
+          if (statusEl) {
+            statusEl.className = 'status loading';
+            statusEl.innerHTML = '<div class="loading-spinner">⏳</div><div>正在刷新状态...</div>';
+          }
+          
+          // 重新加载页面状态
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        });
+      }
+      
+      // 添加提示信息
+      const footerStatus = document.getElementById('footerStatus');
+      if (footerStatus) {
+        footerStatus.innerHTML = '💡 提示：点击配置按钮不会关闭此窗口';
+      }
+    });
+  </script>
 </body>
 </html>
