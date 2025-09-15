@@ -52,13 +52,13 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 // 直接导入模块
-import { DataProcessor, BatchProcessor } from '../utils/dataProcessor'
-import { fileProcessor } from '../utils/fileProcessor'
-import { configManager } from '../utils/configManager'
-import { connectionTester } from '../utils/connectionTester'
-import { FeishuClient } from '../api/feishu'
-import { storageManager } from '../utils/storageManager'
-import { encryptionManager } from '../utils/encryption'
+import { DataProcessor, BatchProcessor } from '/src/utils/dataProcessor'
+import { fileProcessor } from '/src/utils/fileProcessor'
+import { configManager } from '/src/utils/configManager'
+import { connectionTester } from '/src/utils/connectionTester'
+import { FeishuClient } from '/src/api/feishu'
+import { storageManager } from '/src/utils/storageManager'
+import { encryptionManager } from '/src/utils/encryption'
 
 // 延迟初始化组件
 let dataProcessor: DataProcessor | null = null;
