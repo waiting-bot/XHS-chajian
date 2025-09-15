@@ -1093,14 +1093,32 @@ class PopupManager {
       }
       
       // 调用background script处理飞书写入
+      console.log('发送数据到background script:', { noteData: noteData.title, filesCount: files.length })
       const backgroundResponse = await chrome.runtime.sendMessage({
         type: 'PROCESS_NOTE_DATA',
         data: { noteData, files }
       })
       
+      // 打印完整返回值用于调试
+      console.log('Background response', backgroundResponse)
+      
+      // 增加防御性代码 - 检查返回值结构
+      if (!backgroundResponse || typeof backgroundResponse === 'undefined') {
+        console.error('Background script返回异常: 返回值为undefined', backgroundResponse)
+        throw new Error('Background script返回值为undefined，请检查Service Worker状态')
+      }
+      
+      if (typeof backgroundResponse.success === 'undefined') {
+        console.error('Background script返回异常: 缺少success字段', backgroundResponse)
+        throw new Error('Background script返回格式异常')
+      }
+      
       if (!backgroundResponse.success) {
+        console.error('飞书写入失败:', backgroundResponse)
         throw new Error(backgroundResponse.error || '飞书写入失败')
       }
+      
+      console.log('飞书写入成功:', backgroundResponse)
       
       // 完成
       this.resetCollectionState()
