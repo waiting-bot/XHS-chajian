@@ -6,19 +6,17 @@ interface ConfigStatus {
   lastUpdated?: string
   error?: string
   details?: {
+    hasTableUrl: boolean
     hasAppId: boolean
     hasAppSecret: boolean
-    hasAppToken: boolean
-    hasTableId: boolean
   }
 }
 
 interface FeishuConfig {
   name: string
+  tableUrl: string
   appId: string
   appSecret: string
-  appToken: string
-  tableId: string
   notes?: string
   createdAt?: number
   updatedAt?: number
@@ -71,16 +69,28 @@ class PopupManager {
   private configs: Record<string, FeishuConfig> = {}
 
   constructor() {
+    console.log('[PopupManager] PopupManager 实例被创建')
     this.initialize()
   }
 
   private async initialize() {
+    console.log('[PopupManager] 开始初始化...')
     try {
+      console.log('[PopupManager] 步骤1: 加载初始状态...')
       await this.loadInitialStatus()
+      
+      console.log('[PopupManager] 步骤2: 设置事件监听器...')
       this.setupEventListeners()
+      
+      console.log('[PopupManager] 步骤3: 启动状态监控...')
       this.startStatusMonitoring()
+      
+      console.log('[PopupManager] 步骤4: 初始化调试功能...')
+      this.initDebugTools()
+      
+      console.log('[PopupManager] 初始化完成')
     } catch (error) {
-      console.error('初始化失败:', error)
+      console.error('[PopupManager] 初始化失败:', error)
       this.showError('初始化失败', error.message)
     }
   }
@@ -94,17 +104,49 @@ class PopupManager {
   }
 
   private setupEventListeners() {
+    console.log('[PopupManager] 开始设置事件监听器...')
+    
     // 配置相关按钮
-    document.getElementById('testConnection')?.addEventListener('click', () => this.testConnection())
-    document.getElementById('manageConfigs')?.addEventListener('click', () => this.openConfigManager())
-    document.getElementById('refreshConfigs')?.addEventListener('click', () => this.loadConfigurations())
-    document.getElementById('configSelector')?.addEventListener('change', (e) => this.onConfigChange(e))
+    const testConnectionBtn = document.getElementById('testConnection')
+    const manageConfigsBtn = document.getElementById('manageConfigs')
+    const refreshConfigsBtn = document.getElementById('refreshConfigs')
+    const configSelector = document.getElementById('configSelector')
+    
+    console.log('[PopupManager] 查找按钮元素:', {
+      testConnectionBtn: !!testConnectionBtn,
+      manageConfigsBtn: !!manageConfigsBtn,
+      refreshConfigsBtn: !!refreshConfigsBtn,
+      configSelector: !!configSelector
+    })
+    
+    testConnectionBtn?.addEventListener('click', () => {
+      console.log('[PopupManager] 测试连接按钮被点击')
+      this.testConnection()
+    })
+    
+    manageConfigsBtn?.addEventListener('click', () => {
+      console.log('[PopupManager] 管理配置按钮被点击')
+      this.openConfigManager()
+    })
+    
+    refreshConfigsBtn?.addEventListener('click', () => {
+      console.log('[PopupManager] 刷新配置按钮被点击')
+      this.loadConfigurations()
+    })
+    
+    configSelector?.addEventListener('change', (e) => {
+      console.log('[PopupManager] 配置选择器变更')
+      this.onConfigChange(e)
+    })
 
     // 数据操作按钮
     document.getElementById('startCollection')?.addEventListener('click', () => this.startCollection())
     document.getElementById('pauseCollection')?.addEventListener('click', () => this.pauseCollection())
     document.getElementById('refreshData')?.addEventListener('click', () => this.refreshData())
     document.getElementById('togglePreview')?.addEventListener('click', () => this.togglePreview())
+    
+    // 调试按钮
+    document.getElementById('debug-storage')?.addEventListener('click', () => this.debugStorage())
 
     // 模态框相关按钮
     document.getElementById('closeModal')?.addEventListener('click', () => this.closeConfigModal())
@@ -115,7 +157,6 @@ class PopupManager {
     
     // 密码显示切换
     document.getElementById('toggleSecret')?.addEventListener('click', () => this.togglePasswordVisibility('appSecret'))
-    document.getElementById('toggleToken')?.addEventListener('click', () => this.togglePasswordVisibility('appToken'))
 
     // 存储变化监听
     chrome.storage.onChanged.addListener((changes) => this.onStorageChanged(changes))
@@ -137,25 +178,22 @@ class PopupManager {
     try {
       return new Promise((resolve) => {
         chrome.storage.sync.get([
-          'feishuAppToken', 
+          'feishuTableUrl', 
           'feishuAppSecret',
-          'feishuAppId',
-          'feishuTableId'
+          'feishuAppId'
         ], (result) => {
+          const hasTableUrl = !!result.feishuTableUrl
           const hasAppId = !!result.feishuAppId
           const hasAppSecret = !!result.feishuAppSecret
-          const hasAppToken = !!result.feishuAppToken
-          const hasTableId = !!result.feishuTableId
-          const isConfigured = hasAppId && hasAppSecret && hasAppToken && hasTableId
+          const isConfigured = hasTableUrl && hasAppId && hasAppSecret
           
           this.configStatus = {
             isConfigured,
             lastUpdated: new Date().toLocaleTimeString(),
             details: {
+              hasTableUrl,
               hasAppId,
-              hasAppSecret,
-              hasAppToken,
-              hasTableId
+              hasAppSecret
             }
           }
           
@@ -489,32 +527,105 @@ class PopupManager {
   // 配置管理
   private async loadConfigurations() {
     try {
+      console.log('[PopupManager] 开始加载配置...')
       const selector = document.getElementById('configSelector') as HTMLSelectElement
-      if (!selector) return
+      if (!selector) {
+        console.error('[PopupManager] 配置选择器元素不存在')
+        return
+      }
       
       // 加载保存的配置
-      chrome.storage.sync.get(['feishuConfigs'], (result) => {
-        const configs = result.feishuConfigs || {}
-        const configNames = Object.keys(configs)
-        
-        selector.innerHTML = '<option value="">选择配置...</option>'
-        configNames.forEach(name => {
-          const option = document.createElement('option')
-          option.value = name
-          option.textContent = name
-          selector.appendChild(option)
-        })
-        
-        // 恢复上次选择的配置
-        const currentConfig = localStorage.getItem('currentConfig')
-        if (currentConfig && configNames.includes(currentConfig)) {
-          selector.value = currentConfig
-        }
-      })
+      const configs = await this.loadConfigsFromStorage()
+      console.log('[PopupManager] 加载到的配置:', configs)
+      
+      this.refreshConfigSelector(configs)
+      
+      // 恢复上次选择的配置
+      const currentConfigId = localStorage.getItem('currentConfigId')
+      if (currentConfigId && configs[currentConfigId]) {
+        selector.value = currentConfigId
+        console.log('[PopupManager] 恢复配置选择:', currentConfigId)
+      }
+      
+      console.log('[PopupManager] 配置加载完成')
     } catch (error) {
       console.error('加载配置失败:', error)
       this.showError('配置加载失败', error.message)
     }
+  }
+
+  // 从存储加载配置
+  private async loadConfigsFromStorage(): Promise<any> {
+    try {
+      const result = await chrome.storage.sync.get('feishuConfigs')
+      
+      if (!result.feishuConfigs) {
+        console.warn('[PopupManager] 没有找到配置')
+        return {}
+      }
+      
+      // 验证并解析配置
+      return this.parseConfigs(result.feishuConfigs)
+    } catch (error) {
+      console.error('配置加载失败:', error)
+      return {}
+    }
+  }
+
+  // 安全解析配置
+  private parseConfigs(configData: any): any {
+    try {
+      // 如果是字符串，尝试解析JSON
+      if (typeof configData === 'string') {
+        console.log('[PopupManager] 解析配置字符串...')
+        const parsed = JSON.parse(configData)
+        
+        // 验证是否为对象
+        if (typeof parsed !== 'object' || parsed === null) {
+          throw new Error('配置格式错误: 不是对象')
+        }
+        
+        return parsed
+      }
+      
+      // 如果已经是对象，直接返回
+      if (typeof configData === 'object' && configData !== null) {
+        return configData
+      }
+      
+      throw new Error('配置格式错误: 不是对象或字符串')
+    } catch (error) {
+      console.error('配置解析失败:', error)
+      return {}
+    }
+  }
+
+  // 刷新配置选择器
+  private refreshConfigSelector(configs: any) {
+    const selector = document.getElementById('configSelector') as HTMLSelectElement
+    if (!selector) return
+    
+    console.log('[PopupManager] 刷新配置选择器，配置数量:', Object.keys(configs).length)
+    
+    // 清空现有选项
+    selector.innerHTML = ''
+    
+    // 添加默认选项
+    const defaultOption = document.createElement('option')
+    defaultOption.value = ''
+    defaultOption.textContent = '-- 请选择配置 --'
+    selector.appendChild(defaultOption)
+    
+    // 添加配置选项
+    Object.entries(configs).forEach(([id, config]: [string, any]) => {
+      const option = document.createElement('option')
+      option.value = id
+      option.textContent = config.name || id
+      selector.appendChild(option)
+    })
+    
+    // 保存配置到实例变量
+    this.configs = configs
   }
 
   private onConfigChange(event: Event) {
@@ -528,10 +639,9 @@ class PopupManager {
       const config = this.configs[selectedConfigId]
       // 将选中的配置同步到Chrome sync存储以便其他功能使用
       chrome.storage.sync.set({
+        'feishuTableUrl': config.tableUrl,
         'feishuAppId': config.appId,
-        'feishuAppSecret': config.appSecret,
-        'feishuAppToken': config.appToken,
-        'feishuTableId': config.tableId
+        'feishuAppSecret': config.appSecret
       })
     }
     
@@ -559,43 +669,59 @@ class PopupManager {
 
   // 配置管理方法
   private openConfigManager() {
+    console.log('[PopupManager] openConfigManager 被调用')
+    
     const modal = document.getElementById('configModal') as HTMLElement
-    if (!modal) return
+    console.log('[PopupManager] 查找模态框元素:', {
+      modal: !!modal,
+      modalDisplay: modal ? modal.style.display : 'N/A'
+    })
+    
+    if (!modal) {
+      console.error('[PopupManager] 模态框元素不存在')
+      return
+    }
     
     // 重置表单
     const form = document.getElementById('configForm') as HTMLFormElement
+    console.log('[PopupManager] 查找表单元素:', !!form)
     form?.reset()
     
     // 如果当前有选中的配置，填充表单
     const selector = document.getElementById('configSelector') as HTMLSelectElement
     const selectedConfigId = selector?.value
+    console.log('[PopupManager] 当前选中的配置ID:', selectedConfigId)
+    
     if (selectedConfigId && this.configs[selectedConfigId]) {
       const config = this.configs[selectedConfigId]
+      console.log('[PopupManager] 编辑现有配置:', config.name)
+      
       const modalTitle = document.getElementById('modalTitle') as HTMLElement
       if (modalTitle) modalTitle.textContent = '编辑配置'
       
       // 填充表单数据
       const configNameInput = document.getElementById('configName') as HTMLInputElement
+      const tableUrlInput = document.getElementById('tableUrl') as HTMLInputElement
       const appIdInput = document.getElementById('appId') as HTMLInputElement
       const appSecretInput = document.getElementById('appSecret') as HTMLInputElement
-      const appTokenInput = document.getElementById('appToken') as HTMLInputElement
-      const tableIdInput = document.getElementById('tableId') as HTMLInputElement
       const configNotesInput = document.getElementById('configNotes') as HTMLTextAreaElement
       
       if (configNameInput) configNameInput.value = config.name
+      if (tableUrlInput) tableUrlInput.value = config.tableUrl
       if (appIdInput) appIdInput.value = config.appId
       if (appSecretInput) appSecretInput.value = config.appSecret
-      if (appTokenInput) appTokenInput.value = config.appToken
-      if (tableIdInput) tableIdInput.value = config.tableId
       if (configNotesInput) configNotesInput.value = config.notes || ''
     } else {
+      console.log('[PopupManager] 添加新配置')
       const modalTitle = document.getElementById('modalTitle') as HTMLElement
       if (modalTitle) modalTitle.textContent = '添加配置'
     }
     
     // 显示模态框
+    console.log('[PopupManager] 显示模态框...')
     modal.style.display = 'block'
     document.body.style.overflow = 'hidden'
+    console.log('[PopupManager] 模态框已显示，当前display:', modal.style.display)
   }
 
   private closeConfigModal() {
@@ -613,13 +739,12 @@ class PopupManager {
   private async saveConfig() {
     const form = document.getElementById('configForm') as HTMLFormElement
     const configNameInput = document.getElementById('configName') as HTMLInputElement
+    const tableUrlInput = document.getElementById('tableUrl') as HTMLInputElement
     const appIdInput = document.getElementById('appId') as HTMLInputElement
     const appSecretInput = document.getElementById('appSecret') as HTMLInputElement
-    const appTokenInput = document.getElementById('appToken') as HTMLInputElement
-    const tableIdInput = document.getElementById('tableId') as HTMLInputElement
     const configNotesInput = document.getElementById('configNotes') as HTMLTextAreaElement
     
-    if (!form || !configNameInput || !appIdInput || !appSecretInput || !appTokenInput || !tableIdInput) {
+    if (!form || !configNameInput || !tableUrlInput || !appIdInput || !appSecretInput) {
       this.showNotification('错误', '表单元素未找到', 'error')
       return
     }
@@ -632,10 +757,9 @@ class PopupManager {
 
     const configData: FeishuConfig = {
       name: configNameInput.value.trim(),
+      tableUrl: tableUrlInput.value.trim(),
       appId: appIdInput.value.trim(),
       appSecret: appSecretInput.value.trim(),
-      appToken: appTokenInput.value.trim(),
-      tableId: tableIdInput.value.trim(),
       notes: configNotesInput?.value.trim() || '',
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -650,11 +774,21 @@ class PopupManager {
         ['feishu_configs.' + configId]: configData
       })
       
+      // 同时保存到sync存储以便其他功能使用
+      await chrome.storage.sync.set({
+        'feishuTableUrl': configData.tableUrl,
+        'feishuAppId': configData.appId,
+        'feishuAppSecret': configData.appSecret
+      })
+      
       // 更新内存中的配置
       this.configs[configId] = configData
       
       // 重新加载配置列表
       await this.loadConfigs()
+      
+      // 更新配置状态
+      await this.updateConfigStatus()
       
       // 关闭模态框
       this.closeConfigModal()
@@ -669,23 +803,21 @@ class PopupManager {
   }
 
   private async testCurrentConfig() {
+    const tableUrlInput = document.getElementById('tableUrl') as HTMLInputElement
     const appIdInput = document.getElementById('appId') as HTMLInputElement
     const appSecretInput = document.getElementById('appSecret') as HTMLInputElement
-    const appTokenInput = document.getElementById('appToken') as HTMLInputElement
-    const tableIdInput = document.getElementById('tableId') as HTMLInputElement
     const testBtn = document.getElementById('testConfigBtn') as HTMLButtonElement
     
-    if (!appIdInput || !appSecretInput || !appTokenInput || !tableIdInput) {
+    if (!tableUrlInput || !appIdInput || !appSecretInput) {
       this.showNotification('错误', '请先填写完整的配置信息', 'error')
       return
     }
 
     const configData: FeishuConfig = {
       name: '测试配置',
+      tableUrl: tableUrlInput.value.trim(),
       appId: appIdInput.value.trim(),
-      appSecret: appSecretInput.value.trim(),
-      appToken: appTokenInput.value.trim(),
-      tableId: tableIdInput.value.trim()
+      appSecret: appSecretInput.value.trim()
     }
 
     if (testBtn) {
@@ -698,8 +830,14 @@ class PopupManager {
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // 简单的验证逻辑
-      if (configData.appToken && configData.tableId) {
-        this.showNotification('成功', '连接测试成功！配置信息有效', 'success')
+      if (configData.tableUrl && configData.appId && configData.appSecret) {
+        // 验证URL格式
+        try {
+          new URL(configData.tableUrl)
+          this.showNotification('成功', '连接测试成功！配置信息有效', 'success')
+        } catch {
+          throw new Error('多维表格URL格式不正确')
+        }
       } else {
         throw new Error('配置信息不完整')
       }
@@ -941,7 +1079,7 @@ class PopupManager {
 
   // 事件处理
   private onStorageChanged(changes: {[key: string]: chrome.storage.StorageChange}) {
-    const configKeys = ['feishuAppToken', 'feishuAppSecret', 'feishuAppId', 'feishuTableId', 'feishuConfigs']
+    const configKeys = ['feishuTableUrl', 'feishuAppSecret', 'feishuAppId', 'feishuConfigs']
     const hasConfigChange = configKeys.some(key => key in changes)
     
     if (hasConfigChange) {
@@ -1001,9 +1139,134 @@ class PopupManager {
       }
     }, 5000)
   }
+
+  // 调试工具方法
+  private initDebugTools() {
+    // 检查关键元素是否存在
+    setTimeout(() => {
+      const debugInfo = {
+        timestamp: new Date().toISOString(),
+        elements: {
+          configModal: !!document.getElementById('configModal'),
+          manageConfigsBtn: !!document.getElementById('manageConfigs'),
+          testConnectionBtn: !!document.getElementById('testConnection'),
+          refreshConfigsBtn: !!document.getElementById('refreshConfigs'),
+          configSelector: !!document.getElementById('configSelector'),
+          configForm: !!document.getElementById('configForm'),
+          tableUrlInput: !!document.getElementById('tableUrl'),
+          appIdInput: !!document.getElementById('appId'),
+          appSecretInput: !!document.getElementById('appSecret')
+        },
+        modalStyles: {},
+        iconButtons: [],
+        formFields: {}
+      }
+
+      // 检查模态框样式
+      const modal = document.getElementById('configModal')
+      if (modal) {
+        debugInfo.modalStyles = {
+          display: modal.style.display,
+          className: modal.className,
+          computedStyle: window.getComputedStyle(modal).display
+        }
+      }
+
+      // 检查图标按钮
+      const iconButtons = document.querySelectorAll('.icon-button')
+      iconButtons.forEach((btn, index) => {
+        debugInfo.iconButtons.push({
+          index,
+          hasSVG: !!btn.querySelector('svg'),
+          svgCount: btn.querySelectorAll('svg').length,
+          innerHTML: btn.innerHTML.substring(0, 100)
+        })
+      })
+
+      console.log('[Debug] 调试信息:', JSON.stringify(debugInfo, null, 2))
+
+      // 如果没有找到关键元素，显示错误
+      if (!debugInfo.elements.configModal) {
+        console.error('[Debug] 关键元素缺失: configModal')
+      }
+      if (!debugInfo.elements.manageConfigsBtn) {
+        console.error('[Debug] 关键元素缺失: manageConfigsBtn')
+      }
+    }, 1000)
+  }
+
+  // 强制显示模态框的调试方法
+  private debugForceShowModal() {
+    console.log('[Debug] 强制显示模态框')
+    const modal = document.getElementById('configModal')
+    if (modal) {
+      modal.style.display = 'block'
+      modal.style.setProperty('display', 'block', 'important')
+      document.body.style.overflow = 'hidden'
+      console.log('[Debug] 模态框已强制显示')
+    } else {
+      console.error('[Debug] 模态框元素不存在')
+    }
+  }
+
+  // 检查存储的调试功能
+  private async debugStorage() {
+    console.log('[Debug] 开始检查存储...')
+    
+    try {
+      // 检查 sync 存储
+      const syncData = await chrome.storage.sync.get(null)
+      console.log('[Debug] Sync 存储数据:', syncData)
+      
+      // 检查 local 存储
+      const localData = await chrome.storage.local.get(null)
+      console.log('[Debug] Local 存储数据:', localData)
+      
+      // 检查 localStorage
+      const localStorageData = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key) {
+          localStorageData[key] = localStorage.getItem(key)
+        }
+      }
+      console.log('[Debug] localStorage 数据:', localStorageData)
+      
+      // 计算配置数量
+      const feishuConfigs = syncData.feishuConfigs || {}
+      const configCount = typeof feishuConfigs === 'string' ? 
+        JSON.parse(feishuConfigs) : feishuConfigs
+      const actualConfigCount = Object.keys(configCount).length
+      
+      // 显示汇总信息
+      const summary = `
+存储检查结果:
+
+📊 Chrome Sync 存储:
+- 配置数量: ${actualConfigCount}
+- 键数量: ${Object.keys(syncData).length}
+
+📊 Chrome Local 存储:
+- 键数量: ${Object.keys(localData).length}
+
+📊 LocalStorage:
+- 键数量: ${Object.keys(localStorageData).length}
+
+🔍 详细信息请查看控制台
+      `
+      
+      alert(summary)
+      
+      console.log('[Debug] 存储检查完成')
+    } catch (error) {
+      console.error('[Debug] 存储检查失败:', error)
+      alert(`存储检查失败: ${error.message}`)
+    }
+  }
 }
 
 // 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('[Popup] DOM内容已加载，开始初始化PopupManager')
   new PopupManager()
 })

@@ -233,6 +233,19 @@ export class FeishuClient {
       throw new Error('请提供表格ID')
     }
 
+    // 验证配置有效性
+    if (!this.isValidConfig()) {
+      throw new Error('无效的飞书配置')
+    }
+    
+    // 构建请求数据
+    const payload = {
+      fields: record.fields
+    }
+    
+    // 添加调试日志
+    console.debug('飞书写入请求:', payload)
+    
     const url = `${this.config.baseUrl}/open-apis/bitable/v1/apps/${this.config.tableId}/tables/${table}/records`
 
     const response = await fetch(url, {
@@ -241,23 +254,24 @@ export class FeishuClient {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        fields: record.fields,
-      }),
+      body: JSON.stringify(payload),
     })
 
-    if (!response.ok) {
-      throw new Error(`创建记录失败: ${response.status} ${response.statusText}`)
-    }
-
-    const data = await response.json()
-
-    if (data.code !== 0) {
-      throw new Error(`飞书API错误: ${data.msg}`)
+    const result = await response.json()
+    
+    // 添加响应日志
+    console.log('飞书API响应:', {
+      status: response.status,
+      data: result
+    })
+    
+    // 验证响应
+    if (!response.ok || result.code !== 0) {
+      throw new Error(`飞书API错误: ${result.msg || '未知错误'}`)
     }
 
     return {
-      record_id: data.data.record.record_id,
+      record_id: result.data.record.record_id,
     }
   }
 
@@ -385,6 +399,14 @@ export class FeishuClient {
     return !!(
       this.config.accessToken ||
       (this.config.appId && this.config.appSecret)
+    )
+  }
+
+  // 验证配置有效性
+  private isValidConfig(): boolean {
+    return !!(
+      this.config.tableId &&
+      (this.config.accessToken || (this.config.appId && this.config.appSecret))
     )
   }
 }

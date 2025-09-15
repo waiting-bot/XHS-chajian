@@ -124,6 +124,10 @@
             <span class="button-icon">↻</span>
             <span>刷新数据</span>
           </button>
+          <button class="debug-button" id="debug-storage" title="检查存储">
+            <span class="button-icon">🔍</span>
+            <span>检查存储</span>
+          </button>
         </div>
 
         <!-- 错误处理区 -->
@@ -162,34 +166,29 @@
             </div>
             
             <div class="form-field">
-              <label class="field-label">App ID *</label>
-              <input type="text" class="modern-input" id="appId" placeholder="请输入飞书应用ID" required>
+              <label class="field-label">多维表格URL *</label>
+              <input type="url" class="modern-input" id="tableUrl" placeholder="https://example.feishu.cn/base/xxxx" required>
+              <div class="field-help">请输入飞书多维表格的完整URL地址</div>
             </div>
             
             <div class="form-field">
-              <label class="field-label">App Secret *</label>
+              <label class="field-label">APP ID *</label>
+              <input type="text" class="modern-input" id="appId" placeholder="cli_xxxxxx" required>
+              <div class="field-help">飞书应用的APP ID，格式如 cli_xxxxxx</div>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">APP Secret *</label>
               <div class="password-input">
-                <input type="password" class="modern-input" id="appSecret" placeholder="请输入应用密钥" required>
+                <input type="password" class="modern-input" id="appSecret" placeholder="请输入APP Secret" required>
                 <button type="button" class="password-toggle" id="toggleSecret" aria-label="显示/隐藏密钥">👁</button>
               </div>
-            </div>
-            
-            <div class="form-field">
-              <label class="field-label">Access Token *</label>
-              <div class="password-input">
-                <input type="password" class="modern-input" id="appToken" placeholder="请输入访问令牌" required>
-                <button type="button" class="password-toggle" id="toggleToken" aria-label="显示/隐藏令牌">👁</button>
-              </div>
-            </div>
-            
-            <div class="form-field">
-              <label class="field-label">表格 ID *</label>
-              <input type="text" class="modern-input" id="tableId" placeholder="请输入多维表格ID" required>
+              <div class="field-help">飞书应用的APP Secret密钥</div>
             </div>
             
             <div class="form-field">
               <label class="field-label">备注</label>
-              <textarea class="modern-textarea" id="configNotes" placeholder="配置备注信息（可选）" rows="3"></textarea>
+              <textarea class="modern-textarea" id="configNotes" placeholder="配置备注信息（可选）" rows="2"></textarea>
             </div>
           </form>
         </div>
@@ -203,6 +202,65 @@
       </div>
     </div>
 
+    <!-- 调试面板 (开发时使用) -->
+    <div id="debug-panel" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; z-index: 10000; display: none; font-size: 12px; border-radius: 8px; max-width: 300px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <strong>调试信息</strong>
+        <button onclick="document.getElementById('debug-panel').style.display='none'" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">×</button>
+      </div>
+      <div id="debug-content"></div>
+      <div style="margin-top: 8px;">
+        <button onclick="window.debugForceShowModal && window.debugForceShowModal()" style="background: #007aff; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px; font-size: 11px;">强制显示模态框</button>
+        <button onclick="window.checkIcons && window.checkIcons()" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">检查图标</button>
+      </div>
+    </div>
+
     <script type="module" src="popup.ts"></script>
+    <script>
+      // 全局调试函数
+      window.debugForceShowModal = function() {
+        const modal = document.getElementById('configModal');
+        if (modal) {
+          modal.style.display = 'block';
+          modal.style.setProperty('display', 'block', 'important');
+          document.body.style.overflow = 'hidden';
+          console.log('[Debug] 模态框已强制显示');
+        } else {
+          console.error('[Debug] 模态框元素不存在');
+        }
+      };
+
+      window.checkIcons = function() {
+        const iconButtons = document.querySelectorAll('.icon-button');
+        const report = {
+          totalIconButtons: iconButtons.length,
+          details: []
+        };
+        
+        iconButtons.forEach((btn, index) => {
+          const svg = btn.querySelector('svg');
+          report.details.push({
+            index: index,
+            hasSVG: !!svg,
+            svgContent: svg ? svg.outerHTML.substring(0, 100) : 'No SVG',
+            buttonClass: btn.className,
+            buttonHTML: btn.innerHTML.substring(0, 50)
+          });
+        });
+        
+        console.log('[Debug] 图标检查报告:', report);
+        alert('图标检查报告已输出到控制台');
+      };
+
+      // Ctrl+Shift+D 显示调试面板
+      document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+          const panel = document.getElementById('debug-panel');
+          if (panel) {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+          }
+        }
+      });
+    </script>
   </body>
 </html>

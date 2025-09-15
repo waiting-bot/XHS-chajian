@@ -83,6 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
     testConnection()
   })
 
+  // 测试飞书API按钮
+  const testFeishuApiBtn = document.getElementById('testFeishuApi') as HTMLButtonElement
+  testFeishuApiBtn.addEventListener('click', () => {
+    testFeishuApi()
+  })
+
   // 加载配置
   async function loadConfig() {
     try {
@@ -383,6 +389,117 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       toast.className = 'toast hide'
     }, 5000)
+  }
+
+  // 测试飞书API功能
+  async function testFeishuApi() {
+    try {
+      console.log('[Test] 开始测试飞书API...')
+      
+      // 获取当前配置
+      const result = await chrome.storage.sync.get(configFields)
+      const config = result
+      
+      // 验证配置完整性
+      if (!config.feishuAppToken || !config.feishuTableId || (!config.feishuAppId && !config.feishuAppSecret)) {
+        throw new Error('配置不完整，请先保存配置')
+      }
+      
+      console.log('[Test] 当前配置:', {
+        hasAppToken: !!config.feishuAppToken,
+        hasTableId: !!config.feishuTableId,
+        hasAppId: !!config.feishuAppId,
+        hasAppSecret: !!config.feishuAppSecret
+      })
+      
+      // 创建测试数据
+      const testData = {
+        title: '测试标题 - ' + new Date().toLocaleString(),
+        author: '测试作者',
+        content: '这是测试内容，用于验证飞书API连接是否正常工作。',
+        timestamp: Date.now()
+      }
+      
+      console.log('[Test] 测试数据:', testData)
+      
+      // 更新按钮状态
+      setButtonLoading(testFeishuApiBtn, true)
+      updateConnectionStatus('testing', 'API测试中...')
+      
+      // 获取Access Token
+      let accessToken = config.feishuAccessToken
+      
+      if (!accessToken && config.feishuAppId && config.feishuAppSecret) {
+        console.log('[Test] 获取新的Access Token...')
+        const tokenResponse = await fetch(`${config.feishuBaseUrl || 'https://open.feishu.cn'}/open-apis/auth/v3/tenant_access_token/internal`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            app_id: config.feishuAppId,
+            app_secret: config.feishuAppSecret,
+          }),
+        })
+        
+        const tokenData = await tokenResponse.json()
+        
+        if (tokenData.code !== 0) {
+          throw new Error(`获取Token失败: ${tokenData.msg}`)
+        }
+        
+        accessToken = tokenData.tenant_access_token
+        console.log('[Test] Access Token获取成功')
+      }
+      
+      // 构建API请求
+      const payload = {
+        fields: {
+          title: testData.title,
+          author: testData.author,
+          content: testData.content,
+          timestamp: testData.timestamp.toString()
+        }
+      }
+      
+      console.log('[Test] API请求载荷:', payload)
+      
+      // 发送API请求
+      const response = await fetch(`${config.feishuBaseUrl || 'https://open.feishu.cn'}/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+      
+      const apiResult = await response.json()
+      
+      console.log('[Test] API响应:', {
+        status: response.status,
+        data: apiResult
+      })
+      
+      // 验证响应
+      if (!response.ok || apiResult.code !== 0) {
+        throw new Error(`API测试失败: ${apiResult.msg || '未知错误'}`)
+      }
+      
+      // 测试成功
+      const recordId = apiResult.data.record.record_id
+      updateConnectionStatus('connected', 'API测试成功!')
+      showToast(`API测试成功! 记录ID: ${recordId}`, 'success')
+      
+      console.log('[Test] API测试完成，记录ID:', recordId)
+      
+    } catch (error) {
+      console.error('[Test] API测试失败:', error)
+      updateConnectionStatus('disconnected', 'API测试失败')
+      showToast(`API测试失败: ${error.message}`, 'error')
+    } finally {
+      setButtonLoading(testFeishuApiBtn, false)
+    }
   }
 
   // 监听存储变化
