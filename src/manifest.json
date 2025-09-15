@@ -15,23 +15,23 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.xiaohongshu.com/discovery/item/*",
         "https://www.xiaohongshu.com/explore/*",
+        "https://www.xiaohongshu.com/discovery/item/*",
         "https://www.xiaohongshu.com/user/profile/*/post/*"
       ],
       "js": ["content/content.js"],
-      "css": ["content/content.css"]
+      "css": ["content/content.css"],
+      "all_frames": false,
+      "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "src/popup/popup.html",
     "default_title": "小红书笔记采集器",
     "default_icon": {
       "16": "icon16.svg",
       "48": "icon48.svg",
       "128": "icon128.svg"
-    },
-    "persistent": true
+    }
   },
   "options_ui": {
     "page": "src/options/options.html",

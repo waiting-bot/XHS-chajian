@@ -23,6 +23,10 @@ export default defineConfig({
           }
           return 'assets/[name].[ext]'
         },
+        format: 'es',
+        globals: {
+          chrome: 'chrome'
+        }
       },
     },
   },

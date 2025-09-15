@@ -1,3 +1,57 @@
+// 添加脚本注入监控
+const injectedTabs = new Set();
+
+// 在发送消息前检查是否注入
+function ensureContentScriptInjected(tabId: number) {
+  if (!injectedTabs.has(tabId)) {
+    // 动态注入内容脚本
+    chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content/content.js']
+    });
+    injectedTabs.add(tabId);
+  }
+}
+
+// 监听标签页更新
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'complete') {
+    // 清除之前的注入标记
+    injectedTabs.delete(tabId);
+  }
+});
+
+// 添加扩展图标点击监听器 - 打开持久化窗口
+chrome.action.onClicked.addListener(async (tab) => {
+  try {
+    // 检查是否已经打开了popup窗口
+    const windows = await chrome.windows.getAll({
+      windowTypes: ['popup']
+    });
+    
+    const existingWindow = windows.find(window => 
+      window.title && window.title.includes('小红书笔记采集器')
+    );
+    
+    if (existingWindow) {
+      // 如果窗口已存在，聚焦到该窗口
+      await chrome.windows.update(existingWindow.id, { focused: true });
+    } else {
+      // 创建新的popup窗口
+      await chrome.windows.create({
+        url: chrome.runtime.getURL('src/popup/popup.html'),
+        type: 'popup',
+        width: 420,
+        height: 650,
+        focused: true
+      });
+    }
+  } catch (error) {
+    console.error('打开popup窗口失败:', error);
+  }
+});
+
+// 直接导入模块
 import { DataProcessor, BatchProcessor } from '../utils/dataProcessor'
 import { fileProcessor } from '../utils/fileProcessor'
 import { configManager } from '../utils/configManager'
@@ -7,8 +61,8 @@ import { storageManager } from '../utils/storageManager'
 import { encryptionManager } from '../utils/encryption'
 
 // 延迟初始化组件
-let dataProcessor: DataProcessor | null = null
-let batchProcessor: BatchProcessor | null = null
+let dataProcessor: DataProcessor | null = null;
+let batchProcessor: BatchProcessor | null = null;
 
 // 安装事件
 chrome.runtime.onInstalled.addListener(() => {
@@ -415,18 +469,10 @@ async function handleProcessNoteData(
 ) {
   try {
     // 检查配置
-    chrome.storage.sync.get(['feishuAppToken'], result => {
-      if (!result.feishuAppToken) {
-        console.error('缺少飞书配置')
-        // 发送错误通知到popup
-        chrome.runtime.sendMessage({
-          type: 'configError',
-          message: '配置信息不完整',
-        })
-        return
-      }
-      // 原有上传逻辑...
-    })
+    const configs = await chrome.storage.sync.get('feishuConfigs')
+    if (!configs.feishuConfigs || JSON.parse(configs.feishuConfigs).length === 0) {
+      throw new Error('飞书配置不存在，请先在设置中配置飞书信息')
+    }
 
     if (!sender.tab?.url) {
       throw new Error('无法获取页面URL')
@@ -450,10 +496,30 @@ async function handleProcessNoteData(
     // 更新统计
     await dataProcessor.updateProcessingStats(result)
 
-    return result
+    // 返回成功结果
+    return { 
+      success: true, 
+      message: '数据已成功写入飞书',
+      data: result 
+    }
   } catch (error) {
     console.error('处理笔记数据失败:', error)
-    throw error
+    
+    // 返回详细的错误信息
+    let errorMessage = error.message
+    if (error.message.includes('飞书API错误')) {
+      errorMessage = `飞书API调用失败: ${error.message}`
+    } else if (error.message.includes('网络错误')) {
+      errorMessage = '网络连接失败，请检查网络后重试'
+    } else if (error.message.includes('配置')) {
+      errorMessage = '配置信息有误，请检查飞书配置'
+    }
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      details: error.stack 
+    }
   }
 }
 

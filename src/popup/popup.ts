@@ -147,6 +147,9 @@ class PopupManager {
     
     // 调试按钮
     document.getElementById('debug-storage')?.addEventListener('click', () => this.debugStorage())
+    
+    // 窗口控制按钮
+    document.getElementById('closeWindowBtn')?.addEventListener('click', () => this.closeWindow())
 
     // 模态框相关按钮
     document.getElementById('closeModal')?.addEventListener('click', () => this.closeConfigModal())
@@ -769,20 +772,18 @@ class PopupManager {
       // 生成配置ID
       const configId = `config_${Date.now()}`
       
-      // 保存到Chrome存储
+      // 更新内存中的配置
+      this.configs[configId] = configData
+      
+      // 保存到Chrome存储 - 统一使用feishuConfigs格式
       await chrome.storage.local.set({
-        ['feishu_configs.' + configId]: configData
+        'feishuConfigs': JSON.stringify(this.configs)
       })
       
       // 同时保存到sync存储以便其他功能使用
       await chrome.storage.sync.set({
-        'feishuTableUrl': configData.tableUrl,
-        'feishuAppId': configData.appId,
-        'feishuAppSecret': configData.appSecret
+        'feishuConfigs': JSON.stringify(this.configs)
       })
-      
-      // 更新内存中的配置
-      this.configs[configId] = configData
       
       // 重新加载配置列表
       await this.loadConfigs()
@@ -875,10 +876,21 @@ class PopupManager {
       if (!selector) return
       
       // 加载保存的配置
-      const result = await chrome.storage.local.get('feishu_configs')
-      const configs = result.feishu_configs || {}
+      const result = await chrome.storage.local.get('feishuConfigs')
+      let configs = {}
+      
+      if (result.feishuConfigs) {
+        try {
+          configs = JSON.parse(result.feishuConfigs)
+        } catch (parseError) {
+          console.error('解析配置失败:', parseError)
+          configs = {}
+        }
+      }
+      
       this.configs = configs
       
+      // 清空并重新填充下拉框
       selector.innerHTML = '<option value="">选择配置...</option>'
       
       Object.entries(configs).forEach(([id, config]) => {
@@ -1261,6 +1273,16 @@ class PopupManager {
     } catch (error) {
       console.error('[Debug] 存储检查失败:', error)
       alert(`存储检查失败: ${error.message}`)
+    }
+  }
+
+  // 关闭窗口
+  private closeWindow() {
+    console.log('[PopupManager] 关闭窗口')
+    try {
+      window.close()
+    } catch (error) {
+      console.error('关闭窗口失败:', error)
     }
   }
 }
