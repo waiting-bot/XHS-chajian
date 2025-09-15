@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'feishuTableId',
     'feishuBaseUrl',
     'feishuTimeout',
+    'feishuPersonalBaseToken',
   ]
 
   // 加载保存的配置
@@ -47,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         feishuBaseUrl:
           (formData.get('baseUrl') as string) || 'https://open.feishu.cn',
         feishuTimeout: parseInt(formData.get('timeout') as string) || 10000,
+        feishuPersonalBaseToken: '', // 初始化为空，获取Token时更新
       }
 
       console.log('配置对象:', config)
@@ -87,6 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const testFeishuApiBtn = document.getElementById('testFeishuApi') as HTMLButtonElement
   testFeishuApiBtn.addEventListener('click', () => {
     testFeishuApi()
+  })
+
+  // 调试Token权限按钮
+  const debugTokenBtn = document.getElementById('debugTokenBtn') as HTMLButtonElement
+  debugTokenBtn.addEventListener('click', () => {
+    debugTokenPermissions()
   })
 
   // 加载配置
@@ -145,7 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
               feishuAppId: config.feishuAppId,
               feishuAppSecret: config.feishuAppSecret,
               feishuAppToken: config.feishuAppToken,
-              feishuTableId: config.feishuTableId
+              feishuTableId: config.feishuTableId,
+              feishuPersonalBaseToken: config.feishuPersonalBaseToken
             }
           }, (response) => {
             console.log('发送配置更新消息结果:', response);
@@ -391,6 +400,185 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000)
   }
 
+  // 添加安全的API请求函数
+  async function safeApiRequest(url, options = {}, retries = 3) {
+    try {
+      // 验证URL格式
+      const { validateFeishuUrl } = await import('../utils/url-helper.ts')
+      validateFeishuUrl(url)
+      
+      const response = await fetch(url, options)
+      
+      if (!response.ok) {
+        if (response.status >= 500 && retries > 0) {
+          // 服务器错误，重试
+          console.log(`[Debug] 服务器错误，${retries}次重试机会...`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return safeApiRequest(url, options, retries - 1)
+        }
+        
+        const errorText = await response.text()
+        throw new Error(`API请求失败: ${response.status} ${response.statusText}\n${errorText}`)
+      }
+      
+      return response
+    } catch (error) {
+      if (retries > 0) {
+        console.log(`[Debug] 请求失败，${retries}次重试机会...`, error.message)
+        await new Promise(resolve => setTimeout(resolve, 500))
+        return safeApiRequest(url, options, retries - 1)
+      }
+      throw error
+    }
+  }
+
+  
+  // 调试Token权限功能
+  async function debugTokenPermissions() {
+    let config = null
+    try {
+      console.log('[DEBUG] 开始调试Token权限...')
+      updateConnectionStatus("testing", "调试Token权限中...")
+      
+      // 获取配置
+      console.log('[DEBUG] 获取配置...')
+      config = await chrome.storage.sync.get([
+        'feishuAppId', 
+        'feishuAppSecret', 
+        'feishuPersonalBaseToken'
+      ])
+      console.log('[DEBUG] 配置:', JSON.stringify(config, null, 2))
+      
+      let accessToken = config.feishuPersonalBaseToken
+      
+      // Token获取逻辑
+      if (!accessToken) {
+        console.log('[DEBUG] 未找到保存的Token，尝试获取新Token...')
+        
+        const tokenUrl = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal'
+        console.log('[DEBUG] 请求URL:', tokenUrl)
+        console.log('[DEBUG] 请求体:', JSON.stringify({
+          app_id: config.feishuAppId,
+          app_secret: config.feishuAppSecret
+        }))
+        
+        const tokenResponse = await safeApiRequest(tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            app_id: config.feishuAppId,
+            app_secret: config.feishuAppSecret
+          })
+        })
+        
+        console.log('[DEBUG] Token响应状态:', tokenResponse.status)
+        console.log('[DEBUG] Token响应头:', JSON.stringify([...tokenResponse.headers.entries()]))
+        
+        const tokenData = await tokenResponse.json()
+        console.log('[DEBUG] Token响应数据:', JSON.stringify(tokenData, null, 2))
+        
+        if (tokenData.code !== 0) {
+          throw new Error(`获取Token失败: ${tokenData.msg}`)
+        }
+        
+        accessToken = tokenData.tenant_access_token
+        console.log('[DEBUG] 新Token获取成功:', accessToken)
+        
+        // 保存Token到配置
+        await chrome.storage.sync.set({
+          feishuPersonalBaseToken: accessToken
+        })
+        console.log('[DEBUG] Token已保存到配置')
+      } else {
+        console.log('[DEBUG] 使用已保存的Token:', accessToken)
+      }
+      
+      // 直接测试向多维表格写入一条测试记录，而不是调用user_info
+      console.log('[DEBUG] 开始测试多维表格写入...')
+      
+      const testData = {
+        title: '调试测试 - ' + new Date().toLocaleString(),
+        author: '调试作者',
+        content: '这是一条调试测试记录，用于验证Token是否有效。',
+        tags: '调试,测试',
+        likes: 0,
+        favorites: 0,
+        comments: 0,
+        url: '',
+        analysis: '',
+        notes: '调试记录'
+      }
+      
+      const result = await chrome.storage.sync.get(['feishuAppToken', 'feishuTableId', 'feishuBaseUrl'])
+      const appToken = result.feishuAppToken
+      const tableId = result.feishuTableId
+      const baseUrl = result.feishuBaseUrl || 'https://open.feishu.cn'
+      
+      if (!appToken || !tableId) {
+        throw new Error('缺少App Token或Table ID，请先配置多维表格URL')
+      }
+      
+      const writeUrl = `${baseUrl}/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`
+      console.log('[DEBUG] 写入URL:', writeUrl)
+      
+      const payload = {
+        fields: {
+          "标题": testData.title,
+          "作者": testData.author,
+          "正文": testData.content,
+          "标签": Array.isArray(testData.tags)
+                ? testData.tags
+                : (typeof testData.tags === 'string'
+                    ? testData.tags.split(',').map(t => t.trim()).filter(Boolean)
+                    : []),
+          "点赞": testData.likes,
+          "收藏": testData.favorites,
+          "评论": testData.comments,
+          "url": testData.url,
+          "笔记分析": testData.analysis,
+          "采集备注": testData.notes
+        }
+      }
+      
+      console.log('[DEBUG] 写入数据:', payload)
+      
+      const writeResponse = await safeApiRequest(writeUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      
+      console.log('[DEBUG] 写入响应状态:', writeResponse.status)
+      
+      const writeResult = await writeResponse.json()
+      console.log('[DEBUG] 写入响应数据:', JSON.stringify(writeResult, null, 2))
+      
+      if (writeResult.code === 0) {
+        console.log('[DEBUG] Token验证成功，记录ID:', writeResult.data.record.record_id)
+        updateConnectionStatus('connected', 'Token有效')
+        showToast('Token验证通过! 调试记录已写入', 'success')
+        return writeResult
+      } else {
+        throw new Error(`Token验证失败: ${writeResult.msg}`)
+      }
+      
+    } catch (error) {
+      console.error('[DEBUG] 调试失败详情:', {
+        message: error.message,
+        stack: error.stack,
+        config: config ? JSON.stringify(config, null, 2) : '未定义'
+      })
+      updateConnectionStatus("disconnected", "权限错误")
+      showToast(`调试失败: ${error.message}`, 'error')
+      throw error
+    }
+  }
+
   // 测试飞书API功能
   async function testFeishuApi() {
     try {
@@ -427,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateConnectionStatus('testing', 'API测试中...')
       
       // 获取Access Token
-      let accessToken = config.feishuAccessToken
+      let accessToken = config.feishuPersonalBaseToken
       
       if (!accessToken && config.feishuAppId && config.feishuAppSecret) {
         console.log('[Test] 获取新的Access Token...')
@@ -450,15 +638,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         accessToken = tokenData.tenant_access_token
         console.log('[Test] Access Token获取成功')
+        
+        // 保存Access Token到配置中
+        await chrome.storage.sync.set({
+          feishuPersonalBaseToken: accessToken
+        })
+        console.log('[Test] Access Token已保存到配置')
       }
       
       // 构建API请求
       const payload = {
         fields: {
-          title: testData.title,
-          author: testData.author,
-          content: testData.content,
-          timestamp: testData.timestamp.toString()
+          "标题": testData.title,
+          "作者": testData.author,
+          "正文": testData.content,
+          "标签": ["API测试", "调试"],
+          "点赞": 0,
+          "收藏": 0,
+          "评论": 0,
+          "url": "",
+          "笔记分析": "",
+          "采集备注": "API测试记录"
         }
       }
       
