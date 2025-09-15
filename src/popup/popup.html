@@ -7,17 +7,199 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h3>小红书采集器</h3>
-        <div class="config-status" id="configStatus">
-          <!-- 状态将动态渲染在这里 -->
+    <div class="app-container">
+      <!-- 顶部标题栏 -->
+      <header class="app-header">
+        <div class="header-content">
+          <div class="app-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+              <path d="M2 17L12 22L22 17"/>
+              <path d="M2 12L12 17L22 12"/>
+            </svg>
+          </div>
+          <div class="app-title">
+            <h1>小红书采集器</h1>
+            <div class="app-subtitle">数据采集与飞书同步工具</div>
+          </div>
         </div>
       </header>
 
-      <div class="actions">
-        <button id="refreshConfig" class="secondary">刷新状态</button>
-        <button id="openOptions" class="primary">配置插件</button>
+      <!-- 主要内容区域 -->
+      <main class="app-main">
+        <!-- 状态显示区 -->
+        <div class="status-card">
+          <div class="card-header">
+            <h2 class="card-title">系统状态</h2>
+            <div class="status-indicator">
+              <div class="indicator-dot loading" id="pageStatusDot"></div>
+              <span class="status-text" id="pageStatusText">检测中...</span>
+            </div>
+          </div>
+          <div class="card-content">
+            <div class="page-info" id="pageInfo">
+              <div class="loading-state">
+                <div class="loading-spinner"></div>
+                <span>正在检测页面状态</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 配置管理区 -->
+        <div class="config-card">
+          <div class="card-header">
+            <h2 class="card-title">飞书配置</h2>
+            <div class="config-manager-buttons">
+              <button class="icon-button" id="testConnection" title="测试连接" aria-label="测试连接">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z"/>
+                </svg>
+              </button>
+              <button class="icon-button" id="manageConfigs" title="管理配置" aria-label="管理配置">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1V6"/>
+                  <path d="M12 18V23"/>
+                  <path d="M4.22 4.22L7.76 7.76"/>
+                  <path d="M16.24 16.24L19.78 19.78"/>
+                  <path d="M1 12H6"/>
+                  <path d="M18 12H23"/>
+                  <path d="M4.22 19.78L7.76 16.24"/>
+                  <path d="M16.24 7.76L19.78 4.22"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="card-content">
+            <div class="config-selector">
+              <div class="config-selector-group">
+                <select class="modern-select" id="configSelector">
+                  <option value="">选择配置...</option>
+                </select>
+                <button class="icon-button" id="refreshConfigs" title="刷新配置" aria-label="刷新配置">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4V10H7"/>
+                    <path d="M23 20V14H17"/>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="config-status" id="configStatus">
+                <!-- 配置状态将动态渲染在这里 -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据预览区 -->
+        <div class="preview-card" id="previewCard" style="display: none;">
+          <div class="card-header">
+            <h2 class="card-title">数据预览</h2>
+            <button class="expand-button" id="togglePreview" title="展开/收起">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9L12 15L18 9"/>
+              </svg>
+            </button>
+          </div>
+          <div class="card-content" id="previewContent">
+            <div class="loading-state">
+              <div class="loading-spinner"></div>
+              <span>正在采集数据...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作控制区 -->
+        <div class="action-section">
+          <button class="primary-button" id="startCollection" disabled>
+            <span class="button-icon">▶</span>
+            <span>开始采集</span>
+          </button>
+          <button class="secondary-button" id="pauseCollection" disabled>
+            <span class="button-icon">⏸</span>
+            <span>暂停</span>
+          </button>
+          <button class="ghost-button" id="refreshData">
+            <span class="button-icon">↻</span>
+            <span>刷新数据</span>
+          </button>
+        </div>
+
+        <!-- 错误处理区 -->
+        <div class="error-notification-container top-right" id="errorContainer">
+          <!-- 错误通知将动态渲染在这里 -->
+        </div>
+      </main>
+
+      <!-- 底部状态栏 -->
+      <footer class="app-footer">
+        <div class="footer-content">
+          <div class="footer-status" id="footerStatus">
+            就绪
+          </div>
+          <div class="connection-status">
+            <div class="status-dot offline" id="connectionDot"></div>
+            <span id="connectionText">未连接</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 配置编辑模态框 -->
+    <div class="config-modal" id="configModal" style="display: none;">
+      <div class="modal-overlay" id="modalOverlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title" id="modalTitle">编辑配置</h3>
+          <button class="close-button" id="closeModal" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+          <form id="configForm" class="config-form">
+            <div class="form-field">
+              <label class="field-label">配置名称 *</label>
+              <input type="text" class="modern-input" id="configName" placeholder="请输入配置名称" required>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">App ID *</label>
+              <input type="text" class="modern-input" id="appId" placeholder="请输入飞书应用ID" required>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">App Secret *</label>
+              <div class="password-input">
+                <input type="password" class="modern-input" id="appSecret" placeholder="请输入应用密钥" required>
+                <button type="button" class="password-toggle" id="toggleSecret" aria-label="显示/隐藏密钥">👁</button>
+              </div>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">Access Token *</label>
+              <div class="password-input">
+                <input type="password" class="modern-input" id="appToken" placeholder="请输入访问令牌" required>
+                <button type="button" class="password-toggle" id="toggleToken" aria-label="显示/隐藏令牌">👁</button>
+              </div>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">表格 ID *</label>
+              <input type="text" class="modern-input" id="tableId" placeholder="请输入多维表格ID" required>
+            </div>
+            
+            <div class="form-field">
+              <label class="field-label">备注</label>
+              <textarea class="modern-textarea" id="configNotes" placeholder="配置备注信息（可选）" rows="3"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <div class="config-actions">
+            <button type="button" class="ghost-button" id="cancelConfig">取消</button>
+            <button type="button" class="secondary-button" id="testConfigBtn">测试连接</button>
+            <button type="button" class="primary-button" id="saveConfig">保存配置</button>
+          </div>
+        </div>
       </div>
     </div>
 

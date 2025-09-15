@@ -39,6 +39,9 @@ export class StorageManager {
   private isInitialized: boolean = false
   private ready: Promise<void>
   private _resolveReady!: () => void
+  private retryCount: number = 0
+  private maxRetries: number = 3
+  private retryDelay: number = 1000
 
   constructor() {
     // 初始化ready Promise
@@ -54,6 +57,11 @@ export class StorageManager {
     }
 
     try {
+      // 检查Chrome API可用性
+      if (!this.isChromeStorageAvailable()) {
+        throw new Error('Chrome Storage API not available')
+      }
+
       // 监听存储变化
       chrome.storage.onChanged.addListener((changes, area) => {
         this.handleStorageChanges(changes, area)
@@ -140,6 +148,81 @@ export class StorageManager {
         this.cache.delete(key)
       }
     }
+  }
+
+  // 严格的key验证
+  private validateKey(key: string): boolean {
+    if (!key || typeof key !== 'string') {
+      return false
+    }
+    
+    const trimmedKey = key.trim()
+    if (trimmedKey.length === 0) {
+      return false
+    }
+    
+    // 检查key格式：只允许字母、数字、下划线、连字符和点
+    const keyRegex = /^[a-zA-Z0-9_.-]+$/
+    if (!keyRegex.test(trimmedKey)) {
+      return false
+    }
+    
+    // 检查key长度限制
+    if (trimmedKey.length > 256) {
+      return false
+    }
+    
+    // 检查保留前缀
+    const reservedPrefixes = ['chrome.', 'sync.', 'local.', 'session.']
+    if (reservedPrefixes.some(prefix => trimmedKey.startsWith(prefix))) {
+      return false
+    }
+    
+    return true
+  }
+
+  // 检查Chrome API可用性
+  private isChromeStorageAvailable(): boolean {
+    try {
+      return (
+        typeof chrome !== 'undefined' &&
+        chrome &&
+        chrome.storage &&
+        chrome.storage.local &&
+        chrome.storage.sync &&
+        chrome.storage.session &&
+        typeof chrome.storage.local.get === 'function' &&
+        typeof chrome.storage.local.set === 'function' &&
+        typeof chrome.storage.local.remove === 'function'
+      )
+    } catch {
+      return false
+    }
+  }
+
+  // 带重试的存储操作
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = this.maxRetries
+  ): Promise<T> {
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation()
+      } catch (error) {
+        lastError = error as Error
+        console.warn(`[StorageManager] ${operationName} attempt ${attempt} failed:`, error)
+        
+        if (attempt < maxRetries) {
+          const delay = this.retryDelay * attempt
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    }
+    
+    throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`)
   }
 
   private async processBatchQueue(): Promise<void> {
@@ -285,21 +368,25 @@ export class StorageManager {
 
     // 严格key验证
     if (Array.isArray(key)) {
-      const validKeys = key.filter(
-        k => typeof k === 'string' && k.trim().length > 0
-      )
+      const validKeys = key.filter(k => this.validateKey(k))
       if (validKeys.length === 0) {
         console.warn(
           '[StorageManager] No valid keys provided for get operation'
         )
         return Array.isArray(key) ? {} : (defaultValue as T)
       }
-      return this.getMultiple(validKeys, defaultValue as T, options)
+      return this.retryOperation(
+        () => this.getMultiple(validKeys, defaultValue as T, options),
+        'getMultiple'
+      )
     } else {
-      if (!key || typeof key !== 'string' || key.trim().length === 0) {
+      if (!this.validateKey(key)) {
         throw new Error(`[StorageManager] Invalid storage key: ${String(key)}`)
       }
-      return this.getSingle(key, defaultValue as T, options)
+      return this.retryOperation(
+        () => this.getSingle(key, defaultValue as T, options),
+        'getSingle'
+      )
     }
   }
 
@@ -434,17 +521,13 @@ export class StorageManager {
     const { area = 'local', encrypt = false } = options
 
     // 严格key验证
-    if (!key || typeof key !== 'string' || key.trim().length === 0) {
+    if (!this.validateKey(key)) {
       throw new Error(`[StorageManager] Invalid storage key: ${String(key)}`)
     }
 
-    try {
+    await this.retryOperation(async () => {
       // 检查 Chrome Storage API 是否可用
-      if (
-        !chrome ||
-        !chrome.storage ||
-        !chrome.storage[area as keyof typeof chrome.storage]
-      ) {
+      if (!this.isChromeStorageAvailable()) {
         console.warn(
           `[StorageManager] Chrome Storage API (${area}) not available, skipping storage operation`
         )
@@ -478,10 +561,7 @@ export class StorageManager {
 
       // 延迟处理批量队列
       setTimeout(() => this.processBatchQueue(), 100)
-    } catch (error) {
-      console.error(`[StorageManager] Failed to set data ${key}:`, error)
-      throw error
-    }
+    }, 'set')
   }
 
   async remove(
@@ -493,21 +573,25 @@ export class StorageManager {
 
     // 严格key验证
     if (Array.isArray(key)) {
-      const validKeys = key.filter(
-        k => typeof k === 'string' && k.trim().length > 0
-      )
+      const validKeys = key.filter(k => this.validateKey(k))
       if (validKeys.length === 0) {
         console.warn(
           '[StorageManager] No valid keys provided for remove operation'
         )
         return
       }
-      return this.removeMultiple(validKeys, options)
+      return this.retryOperation(
+        () => this.removeMultiple(validKeys, options),
+        'removeMultiple'
+      )
     } else {
-      if (!key || typeof key !== 'string' || key.trim().length === 0) {
+      if (!this.validateKey(key)) {
         throw new Error(`[StorageManager] Invalid storage key: ${String(key)}`)
       }
-      return this.removeSingle(key, options)
+      return this.retryOperation(
+        () => this.removeSingle(key, options),
+        'removeSingle'
+      )
     }
   }
 
